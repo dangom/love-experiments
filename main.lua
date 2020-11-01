@@ -5,7 +5,7 @@
 -- [X] Flicker at a given frequency regardless of FPS
 -- [X] Modulate the intensity of the flickering (osc stimuli)
 -- [X] Randomly flicker a red dot
--- [ ] Log all keypresses and their time in milliseconds from start of experiment
+-- [X] Log all keypresses and their time in milliseconds from start of experiment
 -- [X] Exit on escape
 -- [ ] Give feedback when experiment ends
 
@@ -17,19 +17,28 @@ require("checkerboard")
 
 math.randomseed(os.clock()*100000000000)
 
--- Assume canvas has same size as array.
-local function render_to_texture(canvas, array, colorcode)
+-- Creates a canvas an renders an array to it.
+-- Assumes that colorcode has 2 entries, one for 0 and one for 1.
+local function render_to_texture(array, colorcode)
+   -- Take that the array has the size of the screen.
+   width = #array
+   height = #array[1]
+   canvas = love.graphics.newCanvas(width, height)
    love.graphics.setCanvas(canvas)
    love.graphics.clear()
    love.graphics.setBlendMode("alpha")
+   -- Loop over the array and draw values into the canvas.
    for i,row in ipairs(array) do
       for j,tile in ipairs(row) do
          --First check if the tile is not zero
-         love.graphics.setColor(colorscode[tile+1])
+         love.graphics.setColor(colorcode[tile+1])
          --Draw the tile
          love.graphics.rectangle("fill", i, j, 1, 1)
       end
    end
+   -- Reset canvas so that draw operations outside this function don't overwrite
+   -- it
+   love.graphics.setCanvas()
    return canvas
 end
 
@@ -38,60 +47,50 @@ function love.load()
    -- One of these allows serializing tables for saving.
    lume = require("lume")
 
-   width, height = love.graphics.getDimensions()
+   -- Assume we want to show checkerboard onto full FOV.
+   local width, height = love.graphics.getDimensions()
 
-   sr = 6 -- radial spacing
-   sc = 10 -- concentric spacing
+   -- Configuration of checkerboard taken from Jingyuan's matlab experime
+   local sr = 6 -- radial spacing
+   local sc = 10 -- concentric spacing
+   -- Create the checkerboard pattern
+   local checks = checkerboard(width, height, sr, sc)
 
+   --Create a look up table for the values in the checkerboard.
+   -- A reversed checkerboard is done by reverting the LUT.
+   local lut_forward = {{1, 1, 1},{0, 0, 0}}
+   local lut_backward = {{0, 0, 0},{1, 1, 1}}
 
-   checks = checkerboard(width, height, sr, sc)
+   canvas_forward = render_to_texture(checks, lut_forward)
+   canvas_backward = render_to_texture(checks, lut_backward)
 
-   --Create a table named colors
-   colors_forward = {{1, 1, 1},{0, 0, 0}}
-   colors_backward = {{0, 0, 0},{1, 1, 1}}
+   canvas = canvas_forward -- The initial canvas to be drawn to the screen.
 
-   canvas_forward = love.graphics.newCanvas(width, height)
-   canvas_backward = love.graphics.newCanvas(width, height)
-   -- Rectangle is drawn to the canvas with the regular alpha blend mode.
-   love.graphics.setCanvas(canvas_forward)
-       love.graphics.clear()
-       love.graphics.setBlendMode("alpha")
-       for i,row in ipairs(checks) do
-          for j,tile in ipairs(row) do
-             --First check if the tile is not zero
-             love.graphics.setColor(colors_forward[tile+1])
-             --Draw the tile
-             love.graphics.rectangle("fill", i, j, 1, 1)
-          end
-       end
+   -- Initialize experimental variables.
 
-   love.graphics.setCanvas(canvas_backward)
-       love.graphics.clear()
-       love.graphics.setBlendMode("alpha")
-       for i,row in ipairs(checks) do
-          for j,tile in ipairs(row) do
-             --First check if the tile is not zero
-             love.graphics.setColor(colors_backward[tile+1])
-             --Draw the tile
-             love.graphics.rectangle("fill", i, j, 1, 1)
-          end
-       end
-   love.graphics.setCanvas()
-
-   canvas = canvas_forward
-   time = 0
-   dtotal = 0   -- this keeps track of how much time has passed
+   time = 0 -- The experimental clock in seconds. Kicks off after the trigger is received.
    flickerrate = 12 -- flickering per second.
+   dtotal = 0   -- this keeps track of how much time has passed
    offset = 2 -- seconds before stimulus starts
 
+   -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
    dot_change = math.random(0.8, 3)
+   -- The dot clock
    dot_clock = 0
+   -- Whether the dot is active
    dot_on = true
    dot_color = {0.5, 0, 0}
 
+   -- Maximum acceptable reaction time for color changing.
+   maxrt = 0.5
+
+   -- This is a dummy variable indicating that the experiment hasn't started.
+   -- It signals that the trigger has not been received yet.
    hold = true
 
-   events = {}
+   events = {} -- The events that will be saved to the logfile.
+
+   -- The background color, which should eventually depend on the target luminance.
    love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
 
 end
@@ -106,9 +105,11 @@ function love.update(dt)
    dot_clock = dot_clock + dt
    local change = flickerrate * dt
 
-   dtotal = dtotal + change   -- we add the time passed since the last update, probably a very small number like 0.01
+    -- we add the time passed since the last update, probably a very small number like 0.01
+   dtotal = dtotal + change
    if dtotal >= 1 then
-      dtotal = dtotal - 1   -- reduce our timer by a second, but don't discard the change... what if our framerate is 2/3 of a second?
+      -- reduce our timer by a second, but don't discard the change... what if our framerate is 2/3 of a second?
+      dtotal = dtotal - 1
 
       -- Record that the screen has flickered.
       -- events[#events + 1] = {time, "flicker"}
@@ -120,6 +121,7 @@ function love.update(dt)
       end
    end
 
+   -- Handle the dot
    if dot_clock > dot_change then
       dot_clock = dot_clock - dot_change
       dot_change = math.random(0.8, 3)
@@ -181,7 +183,12 @@ function love.keypressed(key, scancode, isrepeat)
    end
 
    if key == "1" then
-      events[#events + 1] = {time, "keypress", key}
+      if dot_clock < maxrt then
+         response = "true"
+      else
+         response = "false"
+      end
+      events[#events + 1] = {time, "keypress", dot_clock, response}
    end
 end
 
