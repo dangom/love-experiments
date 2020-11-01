@@ -17,72 +17,82 @@ require("checkerboard")
 
 math.randomseed(os.clock()*100000000000)
 
+-- Assume canvas has same size as array.
+local function render_to_texture(canvas, array, colorcode)
+   love.graphics.setCanvas(canvas)
+   love.graphics.clear()
+   love.graphics.setBlendMode("alpha")
+   for i,row in ipairs(array) do
+      for j,tile in ipairs(row) do
+         --First check if the tile is not zero
+         love.graphics.setColor(colorscode[tile+1])
+         --Draw the tile
+         love.graphics.rectangle("fill", i, j, 1, 1)
+      end
+   end
+   return canvas
+end
+
 function love.load()
+   -- Lume is a library with helper functions
+   -- One of these allows serializing tables for saving.
    lume = require("lume")
 
-   -- love.window.setFullscreen(true, "desktop")
    width, height = love.graphics.getDimensions()
+
    sr = 6 -- radial spacing
    sc = 10 -- concentric spacing
+
+
    checks = checkerboard(width, height, sr, sc)
 
    --Create a table named colors
-    colors_forward = {
-        --Fill it with tables filled with RGB numbers
-        {1, 1, 1},
-        {0, 0, 0},
-    }
-    colors_backward = {
-       --Fill it with tables filled with RGB numbers
-        {0, 0, 0},
-        {1, 1, 1},
-    }
+   colors_forward = {{1, 1, 1},{0, 0, 0}}
+   colors_backward = {{0, 0, 0},{1, 1, 1}}
 
-    canvas_forward = love.graphics.newCanvas(width, height)
-    canvas_backward = love.graphics.newCanvas(width, height)
-    -- Rectangle is drawn to the canvas with the regular alpha blend mode.
-    love.graphics.setCanvas(canvas_forward)
-        love.graphics.clear()
-        love.graphics.setBlendMode("alpha")
-        for i,row in ipairs(checks) do
-           for j,tile in ipairs(row) do
-              --First check if the tile is not zero
-              love.graphics.setColor(colors_forward[tile+1])
-              --Draw the tile
-              love.graphics.rectangle("fill", i, j, 1, 1)
-           end
-        end
-    love.graphics.setCanvas()
+   canvas_forward = love.graphics.newCanvas(width, height)
+   canvas_backward = love.graphics.newCanvas(width, height)
+   -- Rectangle is drawn to the canvas with the regular alpha blend mode.
+   love.graphics.setCanvas(canvas_forward)
+       love.graphics.clear()
+       love.graphics.setBlendMode("alpha")
+       for i,row in ipairs(checks) do
+          for j,tile in ipairs(row) do
+             --First check if the tile is not zero
+             love.graphics.setColor(colors_forward[tile+1])
+             --Draw the tile
+             love.graphics.rectangle("fill", i, j, 1, 1)
+          end
+       end
 
-    love.graphics.setCanvas(canvas_backward)
-        love.graphics.clear()
-        love.graphics.setBlendMode("alpha")
-        for i,row in ipairs(checks) do
-           for j,tile in ipairs(row) do
-              --First check if the tile is not zero
-              love.graphics.setColor(colors_backward[tile+1])
-              --Draw the tile
-              love.graphics.rectangle("fill", i, j, 1, 1)
-           end
-        end
-    love.graphics.setCanvas()
+   love.graphics.setCanvas(canvas_backward)
+       love.graphics.clear()
+       love.graphics.setBlendMode("alpha")
+       for i,row in ipairs(checks) do
+          for j,tile in ipairs(row) do
+             --First check if the tile is not zero
+             love.graphics.setColor(colors_backward[tile+1])
+             --Draw the tile
+             love.graphics.rectangle("fill", i, j, 1, 1)
+          end
+       end
+   love.graphics.setCanvas()
 
-    canvas = canvas_forward
+   canvas = canvas_forward
+   time = 0
+   dtotal = 0   -- this keeps track of how much time has passed
+   flickerrate = 12 -- flickering per second.
+   offset = 2 -- seconds before stimulus starts
 
-    time = 0
-    dtotal = 0   -- this keeps track of how much time has passed
-    flickerrate = 12 -- flickering per second.
-    offset = 5 -- seconds before stimulus starts
+   dot_change = math.random(0.8, 3)
+   dot_clock = 0
+   dot_on = true
+   dot_color = {0.5, 0, 0}
 
-    dot_change = math.random(0.8, 3)
-    dot_clock = 0
-    dot_on = true
-    dot_color = {0.5, 0, 0}
+   hold = true
 
-    hold = true
-
-    events = {}
-    love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
+   events = {}
+   love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
 
 end
 
@@ -99,6 +109,10 @@ function love.update(dt)
    dtotal = dtotal + change   -- we add the time passed since the last update, probably a very small number like 0.01
    if dtotal >= 1 then
       dtotal = dtotal - 1   -- reduce our timer by a second, but don't discard the change... what if our framerate is 2/3 of a second?
+
+      -- Record that the screen has flickered.
+      -- events[#events + 1] = {time, "flicker"}
+
       if canvas == canvas_forward then
          canvas = canvas_backward
       else
@@ -136,6 +150,9 @@ function love.draw()
       alpha = 0
    else
       alpha=(((math.sin((time-offset-1/0.1/4)*0.1*math.pi*2)+1)/2)^1)
+      if alpha < 0.000001 then
+         events[#events + 1] = {time, "phase", alpha}
+      end
    end
    love.graphics.setColor(1, 1, 1, alpha)
 
@@ -154,11 +171,12 @@ function love.keypressed(key, scancode, isrepeat)
    if key == "escape" then
       serialized = lume.serialize(events)
       -- The filetype actually doesn't matter, and can even be omitted.
-      love.filesystem.write("logfiles/savedata.txt", serialized)
+      love.filesystem.write("savedata.txt", serialized)
       love.event.quit()
    end
 
    if key == "=" then
+      events[#events + 1] = {time, "trigger", key}
       hold = false
    end
 
