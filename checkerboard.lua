@@ -1,5 +1,11 @@
-function linspace(start, stop, size)
-   -- Same as linspace in matlab
+-----------------------------------------------------------------------------
+-- Auxiliary functions to generate a flickering checkerboard
+-- Author: Daniel Gomez
+-- Date: 10.31.2020
+-----------------------------------------------------------------------------
+
+-- Same as linspace in matlab
+local function linspace(start, stop, size)
    local x = {}
    local diff = stop - start
    for i=0, size-1 do
@@ -8,7 +14,8 @@ function linspace(start, stop, size)
    return x
 end
 
-function meshgrid(x, y)
+-- Same as meshgrid in matlab
+local function meshgrid(x, y)
    -- Same as meshgrid in matlab
    local xx = {}
    local yy = {}
@@ -25,16 +32,20 @@ function meshgrid(x, y)
 
 end
 
-function radial(a, b, spacing_radial)
+-- Auxiliary function to generate values acording to angle
+local function radial(a, b, spacing_radial)
    return math.sin((math.sqrt(a*a + b*b)^0.3)*2*math.pi*spacing_radial)
 end
 
-function concentric(a, b, spacing_concentric)
+-- Auxiliary function to generate values acording to radius
+local function concentric(a, b, spacing_concentric)
    return math.sin(math.atan2(a, b) * spacing_concentric)
 end
 
+-- sign function
 math.sign = math.sign or function(x) return x<0 and -1 or x>0 and 1 or 0 end
 
+-- The checkerboard generation
 function checkerboard(size_x, size_y, sr, sc)
    local lx = linspace(-1, 1, size_y)
    local ly = linspace(-1, 1, size_x)
