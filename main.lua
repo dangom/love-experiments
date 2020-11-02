@@ -88,7 +88,10 @@ function love.load(arg)
    canvas_forward = patterns.render_to_texture(checks, lut_forward)
    canvas_backward = patterns.render_to_texture(checks, lut_backward)
 
-   canvas = canvas_forward -- The initial canvas to be drawn to the screen.
+   canvas = {}
+   canvas[true] = canvas_forward
+   canvas[false] = canvas_backward
+   flicker_state = true
 
    -- Initialize experimental variables.
 
@@ -150,7 +153,8 @@ function love.update(dt)
       -- reduce our timer by a second, but don't discard the change... what if
       -- our framerate is 2/3 of a second?
       dtotal = dtotal - 1
-      love.event.push("flicker")
+      -- Change the flicker state
+      flicker_state = not flicker_state
    end
 
    -- Handle the dot
@@ -178,6 +182,7 @@ function love.draw()
 
    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
    if hold then
+      love.graphics.printf("The task will begin shortly...", 3*width/8, 2*height/5, 2*width/3, 'left')
       -- Draw the dot
       love.graphics.setColor(dot_color)
       love.graphics.circle("fill", width/2, height/2, 10, 100)
@@ -202,7 +207,7 @@ function love.draw()
    if not experiment_finished then
       -- Draw the texture
       love.graphics.setBlendMode("alpha")
-      love.graphics.draw(canvas)
+      love.graphics.draw(canvas[flicker_state])
 
       -- Draw the dot
       love.graphics.setColor(dot_color)
@@ -224,15 +229,6 @@ function love.draw()
       end
    end
 
-end
-
--- Inverts the texture to be painted.
-function love.handlers.flicker()
-   if canvas == canvas_forward then
-      canvas = canvas_backward
-   else
-      canvas = canvas_forward
-   end
 end
 
 -- Updates the dot color.
