@@ -1,0 +1,14 @@
+#+TITLE: LÖVE Experiments
+
+This is my personal stimulus presentation software written with LÖVE. I use because it is lightweight, cross-platform, free and in my opinion easier to use than the alternatives.
+
+To run the experiments, first install [[https://love2d.org/][LÖVE]] and then run `love experiment`, where experiment is a directory containing a =main.lua= file. See the examples in this repository.
+
+Currently, =love-experiments= only supports flickering checkerboards, but it does the following:
+
+- Logging of keypresses and scanner triggers in BIDS compatible format
+- Log results even if the experiment exists early
+- Display participants feedback at the end of the session
+- Parse command line arguments
+
+It is performant enough to run on resource starved computers.
