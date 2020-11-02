@@ -204,7 +204,7 @@ function love.draw()
    if time < offset then
       alpha = 0
    else
-      local phase = (time-offset-1/oscillation_frequency/4)*oscillation_frequency*math.pi*2
+      local phase = (time-offset-1/oscillation_frequency/4)*oscillation_frequency*2*math.pi
       local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
       local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
 
