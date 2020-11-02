@@ -48,7 +48,16 @@ end
 -- Forward declare experimental variables
 local width, height
 local oscillation_frequency, contrast_exponent, luminance
-local canvas_forward, canvas_backward
+local canvas_forward, canvas_backward, canvas
+local time, trigger_count, flickerrate, dtotal, offset
+local dot_change, dot_clock, dot_on, dot_color
+local hold, maxrt
+local events, reactions, reaction_times
+
+local experiment_duration, experiment_finished, wait_clock
+local gray, flicker_state
+local start_time
+local twopifreq
 
 function love.load(arg)
 
@@ -57,7 +66,9 @@ function love.load(arg)
    -- user set variables
    oscillation_frequency = arg[1] or 0.1 -- Hz
    contrast_exponent = arg[2] or 1 -- The exponent of the oscillation.
-   luminance = arg[3] or 0.9
+   luminance = arg[3] or 0.8
+
+   twopifreq = 2*math.pi*oscillation_frequency
 
    -- Assume we want to show checkerboard onto full FOV.
    width, height = love.graphics.getDimensions()
@@ -110,14 +121,15 @@ function love.load(arg)
 
    reactions = {}
    reaction_times = {}
-   experiment_duration = 30
+   experiment_duration = 10
    experiment_finished = false
-   wait_clock = 5
+   wait_clock = 8
 
    -- The background color, which should eventually depend on the target luminance.
    gray = 0.5
    love.graphics.setBackgroundColor(gray, gray, gray)
    love.mouse.setVisible(false)
+   love.graphics.setFont(love.graphics.newFont(30))
    start_time = os.date()
 
 end
@@ -176,7 +188,7 @@ function love.draw()
    if time < offset then
       alpha = 0
    else
-      local phase = (time-offset-1/oscillation_frequency/4)*oscillation_frequency*2*math.pi
+      local phase = (time-offset-1/oscillation_frequency/4)*twopifreq
       local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
       local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
 
@@ -198,13 +210,14 @@ function love.draw()
 
    -- If the experiment has finished, show the average reaction time and the hit rate.
    else
-      love.graphics.setBackgroundColor(1, 1, 1, 1)
-      love.graphics.clear(1, 1, 1, 1)
-      love.graphics.setColor(1,0,0)
-      local hitrate_str = string.format("Hit Rate: %.2f %%", hitrate)
-      love.graphics.print(hitrate_str, width/3 + 20, height/2 - 20, 0, 2, 2)
-      local avg_rt_str = string.format("Average RT: %.2f seconds", avg_rt)
-      love.graphics.print(avg_rt_str, width/3 + 20, height/2 + 20, 0, 2, 2)
+      -- love.graphics.setBackgroundColor(1, 1, 1, 1)
+      -- love.graphics.clear(1, 1, 1, 1)
+      love.graphics.setColor(0.6,0,0)
+      love.graphics.printf("Your task results:", 3*width/18, 2*height/5 - 30, 2*width/3, 'center')
+      local hitrate_str = string.format("Hit Rate = %.2f %%", hitrate)
+      love.graphics.printf(hitrate_str, 3*width/18, 2*height/5 + 20, 2*width/3, 'center')
+      local avg_rt_str = string.format("Average Reaction Time = %.2f seconds", avg_rt)
+      love.graphics.printf(avg_rt_str, 3*width/18, 2*height/5 + 70, 2*width/3, 'center')
       if wait_clock < 0 then
          save_data(events)
          love.event.quit()
