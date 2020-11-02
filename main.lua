@@ -182,7 +182,7 @@ function love.draw()
 
    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
    if hold then
-      love.graphics.printf("The task will begin shortly...", 3*width/8, 2*height/5, 2*width/3, 'left')
+      love.graphics.printf("The task will begin shortly...", 0, 2*height/5, width, 'center')
       -- Draw the dot
       love.graphics.setColor(dot_color)
       love.graphics.circle("fill", width/2, height/2, 10, 100)
@@ -218,15 +218,17 @@ function love.draw()
       -- love.graphics.setBackgroundColor(1, 1, 1, 1)
       -- love.graphics.clear(1, 1, 1, 1)
       love.graphics.setColor(0.6,0,0)
-      love.graphics.printf("Your task results:", 3*width/18, 2*height/5 - 30, 2*width/3, 'center')
+      love.graphics.printf("Your task results:", 0, 2*height/5 - 30, width, 'center')
       local hitrate_str = string.format("Hit Rate = %.2f %%", hitrate)
-      love.graphics.printf(hitrate_str, 3*width/18, 2*height/5 + 20, 2*width/3, 'center')
+      love.graphics.printf(hitrate_str, 0, 2*height/5 + 20, width, 'center')
       local avg_rt_str = string.format("Average Reaction Time = %.2f seconds", avg_rt)
-      love.graphics.printf(avg_rt_str, 3*width/18, 2*height/5 + 70, 2*width/3, 'center')
+      love.graphics.printf(avg_rt_str, 0, 2*height/5 + 70, width, 'center')
+
       if wait_clock < 0 then
          save_data(events)
          love.event.quit()
       end
+
    end
 
 end
