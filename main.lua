@@ -24,67 +24,34 @@
    VALUE - which key was pressed
 --]]
 -----------------------------------------------------------------------------
-local function stimulus_info()
-   local info = {}
-   info["OperatingSystem"] = os.capture("uname")
+local logger = require("tools.log")
+local mathutils = require("tools.mathutils")
 
-   local major, minor, revision, codename = love.getVersion()
-   local software_version = string.format("Version %d.%d.%d - %s", major, minor, revision, codename)
-
-   info["SoftwareName"] = "LÖVE"
-   info["SoftwareVersion"] = software_version
-   info["Stimulus Frequency"] = oscillation_frequency
-   info["Start Time"] = start_time
-   info["Hit Rate"] = 100 * sum(reactions) / #reactions
-   info["Avg. Reaction Time"] = sum(reaction_times) / #reaction_times
-
-   return info
-end
+-- Generate checkerboard and render to texture
+local patterns = require("visual.patterns")
+-- Lume is a library with helper functions
+-- One of these allows serializing tables for saving.
+local lume = require("lib.lume")
 
 function save_data(data)
    -- Save a serialized easy to reload data.
    local serialized = lume.serialize(data)
    love.filesystem.write("savedata.txt", serialized)
    -- And save a human friendly version.
-   local csv = csv_string(data)
+   local csv = logger.to_csv(data)
    love.filesystem.write("savedata.csv", csv)
 
    -- Also save the run info
-   love.filesystem.write("stimulus-info.txt", lume.serialize(stimulus_info()))
+   love.filesystem.write("stimulus-info.txt", lume.serialize(logger.stimulus_info()))
 end
 
--- Creates a canvas an renders an array to it.
--- Assumes that colorcode has 2 entries, one for 0 and one for 1.
-local function render_to_texture(array, colorcode)
-   -- Take that the array has the size of the screen.
-   local width = #array
-   local height = #array[1]
-   canvas = love.graphics.newCanvas(width, height)
-   love.graphics.setCanvas(canvas)
-   love.graphics.clear()
-   love.graphics.setBlendMode("alpha")
-   -- Loop over the array and draw values into the canvas.
-   for i,row in ipairs(array) do
-      for j,tile in ipairs(row) do
-         --First check if the tile is not zero
-         love.graphics.setColor(colorcode[tile+1])
-         --Draw the tile
-         love.graphics.rectangle("fill", i, j, 1, 1)
-      end
-   end
-   -- Reset canvas so that draw operations outside this function don't overwrite
-   -- it
-   love.graphics.setCanvas()
-   return canvas
-end
+-- Forward declare experimental variables
+local width, height
+local oscillation_frequency, contrast_exponent, luminance
+local canvas_forward, canvas_backward
 
 function love.load(arg)
 
-   -- Lume is a library with helper functions
-   -- One of these allows serializing tables for saving.
-   lume = require("lume")
-
-   require("checkerboard")
    math.randomseed(os.clock()*100000000000)
 
    -- user set variables
@@ -98,16 +65,17 @@ function love.load(arg)
    -- Configuration of checkerboard taken from Jingyuan's matlab experiments
    local sr = 6 -- radial spacing
    local sc = 10 -- concentric spacing
+
    -- Create the checkerboard pattern
-   local checks = checkerboard(width, height, sr, sc)
+   local checks = patterns.checkerboard(width, height, sr, sc)
 
    --Create a look up table for the values in the checkerboard.
    -- A reversed checkerboard is done by reverting the LUT.
    local lut_forward = {{1, 1, 1},{0, 0, 0}}
    local lut_backward = {{0, 0, 0},{1, 1, 1}}
 
-   canvas_forward = render_to_texture(checks, lut_forward)
-   canvas_backward = render_to_texture(checks, lut_backward)
+   canvas_forward = patterns.render_to_texture(checks, lut_forward)
+   canvas_backward = patterns.render_to_texture(checks, lut_backward)
 
    canvas = canvas_forward -- The initial canvas to be drawn to the screen.
 
@@ -121,7 +89,7 @@ function love.load(arg)
    offset = 2 -- seconds before stimulus starts
 
    -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
-   dot_change = random_float(0.8, 3)
+   dot_change = mathutils.random_float(0.8, 3)
    -- The dot clock
    dot_clock = 0
    -- Whether the dot is active
@@ -147,7 +115,7 @@ function love.load(arg)
    wait_clock = 5
 
    -- The background color, which should eventually depend on the target luminance.
-   gray = luminance / 2
+   gray = 0.5
    love.graphics.setBackgroundColor(gray, gray, gray)
    love.mouse.setVisible(false)
    start_time = os.date()
@@ -177,7 +145,7 @@ function love.update(dt)
    dot_clock = dot_clock + dt
    if dot_clock > dot_change then
       dot_clock = dot_clock - dot_change
-      dot_change = random_float(0.8, 3)
+      dot_change = mathutils.random_float(0.8, 3)
       love.event.push("flip_dot")
       reactions[#reactions + 1] = "N/A" -- This will be overwritten by 0 if late or 1 if response
    end
@@ -185,8 +153,8 @@ function love.update(dt)
    -- State changes if experiment comes to an end
    if time > experiment_duration then
       if not experiment_finished then
-         hitrate = 100 * sum(reactions) / #reactions
-         avg_rt = sum(reaction_times) / #reaction_times
+         hitrate = 100 * mathutils.sum(reactions) / #reactions
+         avg_rt = mathutils.sum(reaction_times) / #reaction_times
       end
       experiment_finished = true
       wait_clock = wait_clock - dt

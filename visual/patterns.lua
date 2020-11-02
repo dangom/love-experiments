@@ -3,6 +3,7 @@
 -- Author: Daniel Gomez
 -- Date: 10.31.2020
 -----------------------------------------------------------------------------
+local patterns = {}
 
 -- Same as linspace in matlab
 local function linspace(start, stop, size)
@@ -46,7 +47,7 @@ end
 math.sign = math.sign or function(x) return x<0 and -1 or x>0 and 1 or 0 end
 
 -- The checkerboard generation
-function checkerboard(size_x, size_y, sr, sc)
+patterns.checkerboard = function(size_x, size_y, sr, sc)
    local lx = linspace(-1, 1, size_y)
    local ly = linspace(-1, 1, size_x)
    local x, y = meshgrid(lx, ly)
@@ -66,42 +67,29 @@ function checkerboard(size_x, size_y, sr, sc)
 
 end
 
-function csv_string(t)
-   local out = {}
-   local s = tostring
-   for k, r in pairs(t) do
-      local rowstr = string.format("%s\t%s\t%s\t%s\t%s\t%s",
-                                   s(r[1]), s(r[2]), s(r[3]), s(r[4]), s(r[5]), s(r[6]))
-      out[#out+1] = rowstr
+-- Creates a canvas an renders an array to it.
+-- Assumes that colorcode has 2 entries, one for 0 and one for 1.
+patterns.render_to_texture = function(array, colorcode)
+   -- Take that the array has the size of the screen.
+   local width = #array
+   local height = #array[1]
+   canvas = love.graphics.newCanvas(width, height)
+   love.graphics.setCanvas(canvas)
+   love.graphics.clear()
+   love.graphics.setBlendMode("alpha")
+   -- Loop over the array and draw values into the canvas.
+   for i,row in ipairs(array) do
+      for j,tile in ipairs(row) do
+         --First check if the tile is not zero
+         love.graphics.setColor(colorcode[tile+1])
+         --Draw the tile
+         love.graphics.rectangle("fill", i, j, 1, 1)
+      end
    end
-   return table.concat(out, "\n")
+   -- Reset canvas so that draw operations outside this function don't overwrite
+   -- it
+   love.graphics.setCanvas()
+   return canvas
 end
 
--- Capture output of command line command
-function os.capture(cmd, raw)
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
-  f:close()
-  if raw then return s end
-  s = string.gsub(s, '^%s+', '')
-  s = string.gsub(s, '%s+$', '')
-  s = string.gsub(s, '[\n\r]+', ' ')
-  return s
-end
-
--- Sum all elements of a table
-function sum(t)
-    local sum = 0
-    for k,v in pairs(t) do
-       if type(v) == "number" then
-          sum = sum + v
-       end
-    end
-
-    return sum
-end
-
--- Generate a random (uniform) floating number between low and high
-function random_float(low, high)
-   return low + math.random()  * (high - low)
-end
+return patterns
