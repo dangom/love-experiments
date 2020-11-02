@@ -189,22 +189,20 @@ function love.draw()
       return
    end
 
-   -- This means experiment started, but we are waiting for a steady state.
-   if time < offset then
-      alpha = 0
-   else
-      local phase = (time-offset-1/oscillation_frequency/4)*twopifreq
-      local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
-      local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
-
-      alpha=(((math.sin(phase)+alpha_offset)/alpha_normalization)^contrast_exponent) * luminance
-   end
-
-   -- very important!: reset color before drawing to canvas to have colors properly displayed
-   -- see discussion here: https://love2d.org/forums/viewtopic.php?f=4&p=211418#p211418
-   love.graphics.setColor(1, 1, 1, alpha)
-
    if not experiment_finished then
+      -- This means experiment started, but we are waiting for a steady state.
+      if time < offset then
+         alpha = 0
+      else
+         local phase = (time-offset-1/oscillation_frequency/4)*twopifreq
+         local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
+         local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
+         alpha=(((math.sin(phase)+alpha_offset)/alpha_normalization)^contrast_exponent) * luminance
+      end
+
+      -- very important!: reset color before drawing to canvas to have colors properly displayed
+      -- see discussion here: https://love2d.org/forums/viewtopic.php?f=4&p=211418#p211418
+      love.graphics.setColor(1, 1, 1, alpha)
       -- Draw the texture
       love.graphics.setBlendMode("alpha")
       love.graphics.draw(canvas[flicker_state])
