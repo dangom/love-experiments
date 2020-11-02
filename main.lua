@@ -7,7 +7,7 @@
 -- [X] Randomly flicker a red dot
 -- [X] Log all keypresses and their time in milliseconds from start of experiment
 -- [X] Exit on escape
--- [ ] Give feedback when experiment ends
+-- [X] Give feedback when experiment ends
 
 -- Author: Daniel Gomez
 -- Date: 10.31.2020
@@ -24,12 +24,8 @@
    VALUE - which key was pressed
 --]]
 -----------------------------------------------------------------------------
-require("checkerboard")
-
-math.randomseed(os.clock()*100000000000)
-
 local function stimulus_info()
-   info = {}
+   local info = {}
    info["OperatingSystem"] = os.capture("uname")
 
    local major, minor, revision, codename = love.getVersion()
@@ -47,10 +43,10 @@ end
 
 function save_data(data)
    -- Save a serialized easy to reload data.
-   serialized = lume.serialize(data)
+   local serialized = lume.serialize(data)
    love.filesystem.write("savedata.txt", serialized)
    -- And save a human friendly version.
-   csv = csv_string(data)
+   local csv = csv_string(data)
    love.filesystem.write("savedata.csv", csv)
 
    -- Also save the run info
@@ -61,8 +57,8 @@ end
 -- Assumes that colorcode has 2 entries, one for 0 and one for 1.
 local function render_to_texture(array, colorcode)
    -- Take that the array has the size of the screen.
-   width = #array
-   height = #array[1]
+   local width = #array
+   local height = #array[1]
    canvas = love.graphics.newCanvas(width, height)
    love.graphics.setCanvas(canvas)
    love.graphics.clear()
@@ -82,15 +78,24 @@ local function render_to_texture(array, colorcode)
    return canvas
 end
 
-function love.load()
+function love.load(arg)
+
    -- Lume is a library with helper functions
    -- One of these allows serializing tables for saving.
    lume = require("lume")
 
+   require("checkerboard")
+   math.randomseed(os.clock()*100000000000)
+
+   -- user set variables
+   oscillation_frequency = arg[1] or 0.1 -- Hz
+   contrast_exponent = arg[2] or 1 -- The exponent of the oscillation.
+   luminance = arg[3] or 0.9
+
    -- Assume we want to show checkerboard onto full FOV.
    width, height = love.graphics.getDimensions()
 
-   -- Configuration of checkerboard taken from Jingyuan's matlab experime
+   -- Configuration of checkerboard taken from Jingyuan's matlab experiments
    local sr = 6 -- radial spacing
    local sc = 10 -- concentric spacing
    -- Create the checkerboard pattern
@@ -112,11 +117,8 @@ function love.load()
    trigger_count = -1 -- The number of triggers received
    flickerrate = 12 -- flickering per second.
    dtotal = 0   -- this keeps track of how much time has passed
-   offset = 4 -- seconds before stimulus starts
 
-   oscillation_frequency = 0.16 -- Hz
-   contrast_exponent = 1 -- The exponent of the oscillation.
-   luminance = 0.7
+   offset = 2 -- seconds before stimulus starts
 
    -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
    dot_change = random_float(0.8, 3)
@@ -126,7 +128,7 @@ function love.load()
    dot_on = true
    dot_color = {0.5, 0, 0}
 
-   -- Maximum acceptable reaction time for color changing.
+   -- Maximum acceptable reaction time for button press hit rate calc.
    maxrt = 0.6
 
    -- This is a dummy variable indicating that the experiment hasn't started.
@@ -140,13 +142,14 @@ function love.load()
 
    reactions = {}
    reaction_times = {}
-   experiment_duration = 10
+   experiment_duration = 30
    experiment_finished = false
    wait_clock = 5
 
    -- The background color, which should eventually depend on the target luminance.
    gray = luminance / 2
    love.graphics.setBackgroundColor(gray, gray, gray)
+   love.mouse.setVisible(false)
    start_time = os.date()
 
 end
@@ -176,9 +179,10 @@ function love.update(dt)
       dot_clock = dot_clock - dot_change
       dot_change = random_float(0.8, 3)
       love.event.push("flip_dot")
-      reactions[#reactions + 1] = "N/A"
+      reactions[#reactions + 1] = "N/A" -- This will be overwritten by 0 if late or 1 if response
    end
 
+   -- State changes if experiment comes to an end
    if time > experiment_duration then
       if not experiment_finished then
          hitrate = 100 * sum(reactions) / #reactions
