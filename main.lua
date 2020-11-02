@@ -28,42 +28,7 @@ require("checkerboard")
 
 math.randomseed(os.clock()*100000000000)
 
--- Sum all elements of a table
-function sum(t)
-    local sum = 0
-    for k,v in pairs(t) do
-       if type(v) == "number" then
-          sum = sum + v
-       end
-    end
-
-    return sum
-end
-
-function csv_string(t)
-   local out = {}
-   local s = tostring
-   for k, r in pairs(t) do
-      local rowstr = string.format("%s\t%s\t%s\t%s\t%s\t%s",
-                                   s(r[1]), s(r[2]), s(r[3]), s(r[4]), s(r[5]), s(r[6]))
-      out[#out+1] = rowstr
-   end
-   return table.concat(out, "\n")
-end
-
--- Capture output of command line command
-function os.capture(cmd, raw)
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
-  f:close()
-  if raw then return s end
-  s = string.gsub(s, '^%s+', '')
-  s = string.gsub(s, '%s+$', '')
-  s = string.gsub(s, '[\n\r]+', ' ')
-  return s
-end
-
-local function software_info()
+local function stimulus_info()
    info = {}
    info["OperatingSystem"] = os.capture("uname")
 
@@ -72,10 +37,25 @@ local function software_info()
 
    info["SoftwareName"] = "LÖVE"
    info["SoftwareVersion"] = software_version
+   info["Stimulus Frequency"] = oscillation_frequency
+   info["Start Time"] = start_time
+   info["Hit Rate"] = 100 * sum(reactions) / #reactions
+   info["Avg. Reaction Time"] = sum(reaction_times) / #reaction_times
 
    return info
 end
 
+function save_data(data)
+   -- Save a serialized easy to reload data.
+   serialized = lume.serialize(data)
+   love.filesystem.write("savedata.txt", serialized)
+   -- And save a human friendly version.
+   csv = csv_string(data)
+   love.filesystem.write("savedata.csv", csv)
+
+   -- Also save the run info
+   love.filesystem.write("stimulus-info.txt", lume.serialize(stimulus_info()))
+end
 
 -- Creates a canvas an renders an array to it.
 -- Assumes that colorcode has 2 entries, one for 0 and one for 1.
@@ -139,7 +119,7 @@ function love.load()
    luminance = 0.7
 
    -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
-   dot_change = math.random(0.8, 3)
+   dot_change = random_float(0.8, 3)
    -- The dot clock
    dot_clock = 0
    -- Whether the dot is active
@@ -160,13 +140,14 @@ function love.load()
 
    reactions = {}
    reaction_times = {}
-   experiment_duration = 20
+   experiment_duration = 10
    experiment_finished = false
    wait_clock = 5
 
    -- The background color, which should eventually depend on the target luminance.
    gray = luminance / 2
    love.graphics.setBackgroundColor(gray, gray, gray)
+   start_time = os.date()
 
 end
 
@@ -193,7 +174,7 @@ function love.update(dt)
    dot_clock = dot_clock + dt
    if dot_clock > dot_change then
       dot_clock = dot_clock - dot_change
-      dot_change = math.random(0.8, 3)
+      dot_change = random_float(0.8, 3)
       love.event.push("flip_dot")
       reactions[#reactions + 1] = "N/A"
    end
@@ -247,9 +228,11 @@ function love.draw()
    else
       love.graphics.setBackgroundColor(1, 1, 1, 1)
       love.graphics.clear(1, 1, 1, 1)
-      love.graphics.setColor(dot_color)
-      love.graphics.print("Hit Rate: " .. tostring(hitrate) .. "%", width/2 - 40, height/2 - 10)
-      love.graphics.print("Average RT: " .. tostring(avg_rt), width/2 - 40, height/2 + 20)
+      love.graphics.setColor(1,0,0)
+      local hitrate_str = string.format("Hit Rate: %.2f %%", hitrate)
+      love.graphics.print(hitrate_str, width/3 + 20, height/2 - 20, 0, 2, 2)
+      local avg_rt_str = string.format("Average RT: %.2f seconds", avg_rt)
+      love.graphics.print(avg_rt_str, width/3 + 20, height/2 + 20, 0, 2, 2)
       if wait_clock < 0 then
          save_data(events)
          love.event.quit()
@@ -280,16 +263,6 @@ end
 
 function love.handlers.log(onset, duration, sample, trial_type, response_time, value)
    events[#events + 1] = {onset, duration, sample, trial_type, response_time, value}
-end
-
-
-function save_data(data)
-   -- Save a serialized easy to reload data.
-   serialized = lume.serialize(data)
-   love.filesystem.write("savedata.txt", serialized)
-   -- And save a human friendly version.
-   csv = csv_string(data)
-   love.filesystem.write("savedata.csv", csv)
 end
 
 -- Handle keypresses.
