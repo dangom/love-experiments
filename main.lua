@@ -14,7 +14,7 @@ local logger = require("tools.log") -- my logging utilities
 local mathutils = require("tools.mathutils") -- my aux math functions
 local patterns = require("visual.patterns") -- generate flicker checkerboard
 local lume = require("lib.lume") -- for serializing data into a string
-local json = require("lib.JSON")
+local json = require("lib.JSON") -- for serializing data into json
 
 -- Forward declare experimental variables
 local window = {} -- Window configuration, height and width
@@ -24,7 +24,7 @@ local state = {} -- Current state of the task
 local dot = {} -- Control the center dot
 local events = {} -- A variable for logging events.
 -- Add a header to the recorded events.
-events[1] = {"ONSET", "DURATION"," SAMPLE", "TRIAL_TYPE", "RESPONSE_TIME", "VALUE"}
+events[1] = {"onset", "duration"," sample", "trial_type", "response_time", "value"}
 
 local reactions = {} -- A table of reactions to each dot change in the experiment
 local reaction_times = {} -- A table with reaction times.
@@ -59,13 +59,12 @@ function love.load(arg)
 
    -- user set variables
    task.FREQUENCY = tonumber(arg[1]) or 0.1 -- Hz
-   task.FREQUENCY_RADS = 2 * math.pi * task.FREQUENCY
    task.EXPONENT = tonumber(arg[2]) or 1 -- The exponent of the oscillation.
    task.LUMINANCE = tonumber(arg[3]) or 0.8
    -- Configuration of checkerboard taken from Jingyuan's matlab experiments
    task.RADIAL_SPACING = 6 -- radial spacing
    task.CONCENTRIC_SPACING = 10 -- concentric spacing
-   task.FLICKERRATE = 12 -- flickering per second.
+   task.FLICKER_FREQUENCY = 12 -- flickering in Hz.
    -- Configuration of the dot
    task.dot = {}
    task.dot.SIZE = 10
@@ -73,8 +72,8 @@ function love.load(arg)
    task.MAX_REACTION_TIME = 0.6 -- seconds
    -- Task timing
    task.timing = {}
-   task.timing.OFFSET = 10
-   task.timing.TOTAL_DURATION = 20
+   task.timing.OFFSET = 5
+   task.timing.TOTAL_DURATION = 30
    task.timing.RESULTS_DISPLAY_DURATION = 4
    task.ACQUISITION_DATE = os.date()
 
@@ -92,6 +91,9 @@ function love.load(arg)
    state.is_finished = false
    state.time = 0 -- The experimental clock in seconds. Kicks off after the trigger is received.
    state.flicker_time = 0   -- this keeps track of how much time has passed in flicker cycles
+   state.modulation_time = - task.timing.OFFSET * task.FREQUENCY -- this keeps track of how much the oscillation has evolved
+   state.phase = 0 -- the phase of the stimulus
+   state.alpha = 0 -- the instantaneous stimulus intensity
    state.trigger_count = -1 -- The number of triggers received
    state.results_display_time_left = task.timing.RESULTS_DISPLAY_DURATION
 
@@ -125,7 +127,9 @@ function love.update(dt)
    -- Advance clock.
    state.time = state.time + dt
    -- Advance flicker normalized by flicker rate (change independent of FPS)
-   state.flicker_time = state.flicker_time + task.FLICKERRATE * dt
+   state.flicker_time = state.flicker_time + task.FLICKER_FREQUENCY * dt
+   -- Advance modulation clock
+   state.modulation_time = state.modulation_time + task.FREQUENCY * dt
    -- Advance dot reaction time clock
    dot.clock = dot.clock + dt
 
@@ -143,6 +147,10 @@ function love.update(dt)
       if not state.is_finished then
          results.hitrate = 100 * mathutils.sum(reactions) / #reactions
          results.avg_rt = mathutils.sum(reaction_times) / #reaction_times
+
+         love.event.push(
+            "log", state.time, 0, state.trigger_count, "FINISH", "N/A", string.format("%.2f %%", results.hitrate)
+         )
       end
       state.is_finished = true
       state.results_display_time_left = state.results_display_time_left - dt
@@ -162,18 +170,18 @@ function love.draw()
    end
 
    if not state.is_finished then
-      local alpha
       -- This means experiment started, but we are waiting for a steady state.
       if state.time < task.timing.OFFSET then
-         alpha = 0
+         state.phase = math.pi
+         state.alpha = 0
       else
-         local phase = (state.time-task.timing.OFFSET-1/task.FREQUENCY/4)*task.FREQUENCY_RADS
          local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
          local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
-         alpha=(((math.sin(phase)+alpha_offset)/alpha_normalization)^task.EXPONENT) * task.LUMINANCE
+         state.phase = (state.modulation_time + 0.5) % 1 * 2 * math.pi
+         state.alpha = ((math.cos(state.phase)+alpha_offset)/alpha_normalization)^task.EXPONENT * task.LUMINANCE
       end
 
-      love.graphics.setColor(1, 1, 1, alpha)
+      love.graphics.setColor(1, 1, 1, state.alpha)
       -- Draw the texture
       love.graphics.setBlendMode("alpha")
       love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
@@ -181,6 +189,13 @@ function love.draw()
       -- Draw the dot
       love.graphics.setColor(dot.color)
       love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
+
+      -- Debug clocks
+      -- if true then
+      --    love.graphics.setColor(0.7, 0, 0)
+      --    love.graphics.printf(state.time, 0, window.HEIGHT/5, window.WIDTH, 'center')
+      --    love.graphics.printf(state.modulation_time, 0, 2*window.HEIGHT/5, window.WIDTH, 'center')
+      -- end
 
       if dot.draw_pressed then
          if reactions[#reactions] == 1 then
@@ -218,6 +233,8 @@ end
 -- Handle keypresses.
 function love.keypressed(key, scancode)
    if key == "escape" then
+      -- Don't push it to the async event logger because we will save and quit immediately.
+      events[#events + 1] = {state.time, 0, state.trigger_count, "CANCELLED", "n/a", "n/a"}
       save_data(events, task)
       love.event.quit()
    end
@@ -226,7 +243,7 @@ function love.keypressed(key, scancode)
    if key == "=" then
       state.trigger_count = state.trigger_count + 1
       love.event.push(
-         "log", state.time, 0, state.trigger_count, "TRIGGER", "N/A", "N/A"
+         "log", state.time, 0, state.trigger_count, "TRIGGER", state.phase, math.floor(state.modulation_time + 0.5)
       )
       state.is_running = true
    end
