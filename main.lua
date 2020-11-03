@@ -86,6 +86,7 @@ function love.load(arg)
    -- Whether the dot is active
    dot.is_active = true
    dot.color = {0.5, 0, 0}
+   dot.draw_pressed = false
 
    -- The background color, which should eventually depend on the target luminance.
    love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
@@ -158,6 +159,15 @@ function love.draw()
       love.graphics.setColor(dot.color)
       love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
 
+      if dot.draw_pressed then
+         if reactions[#reactions] == 1 then
+            love.graphics.setColor(0,1,0)
+         else
+            love.graphics.setColor(1,0,0)
+         end
+         love.graphics.circle("line", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
+      end
+
    -- If the experiment has finished, show the average reaction time and the hit rate.
    else
       local hitrate_str = string.format("Hit Rate = %.2f %%", hitrate)
@@ -205,12 +215,12 @@ function love.keypressed(key, scancode, isrepeat)
       love.event.push(
          "log", state.time, 0, state.trigger_count, "KEYPRESS", dot.clock, key
       )
-      -- draw_pressed = true
+      dot.draw_pressed = true
    end
 end
 
 function love.keyreleased(key, scancode)
    if key == "1" then
-      -- draw_pressed = false
+      dot.draw_pressed = false
    end
 end
