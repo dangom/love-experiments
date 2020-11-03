@@ -1,244 +1,178 @@
 -----------------------------------------------------------------------------
 -- Run a flickering checkerboard visual experiment
 
--- Goals:
--- [X] Flicker at a given frequency regardless of FPS
--- [X] Modulate the intensity of the flickering (osc stimuli)
--- [X] Randomly flicker a red dot
--- [X] Log all keypresses and their time in milliseconds from start of experiment
--- [X] Exit on escape
--- [X] Give feedback when experiment ends
-
 -- Author: Daniel Gomez
 -- Date: 10.31.2020
-
---[[
- For logging data in BIDS format, events are saved as following:
-   ONSET, DURATION, SAMPLE, TRIAL_TYPE, RESPONSE_TIME, VALUE
-   where
-   ONSET - the time given in seconds from the first trigger (beginning of acquisition)
-   DURATION - the duration of the event
-   SAMPLE - in which volume TR the event happened.
-   TRIAL_TYPE - categorisation of trial
-   RESPONSE_TIME - the reaction time. N/A refers to no-response
-   VALUE - which key was pressed
---]]
 -----------------------------------------------------------------------------
 local logger = require("tools.log")
 local mathutils = require("tools.mathutils")
-
--- Generate checkerboard and render to texture
 local patterns = require("visual.patterns")
--- Lume is a library with helper functions
--- One of these allows serializing tables for saving.
 local lume = require("lib.lume")
 
-function save_data(data)
+-- Forward declare experimental variables
+local window = {} -- Window configuration, height and width
+local task = {} -- Task experimental setup variables
+local canvas = {} -- The off-screen canvas with the images to be drawn to screen
+local state = {} -- Current state of the task
+local dot = {}
+local events = {} -- A variable for logging events.
+-- Add a header to the recorded events.
+events[1] = {"ONSET", "DURATION"," SAMPLE", "TRIAL_TYPE", "RESPONSE_TIME", "VALUE"}
+
+local reactions = {} -- A table of reactions to each dot change in the experiment
+local reaction_times = {} -- A table with reaction times.
+
+
+local function save_data(data)
    -- Save a serialized easy to reload data.
    local serialized = lume.serialize(data)
-   love.filesystem.write("savedata.txt", serialized)
-   -- And save a human friendly version.
    local csv = logger.to_csv(data)
-   love.filesystem.write("savedata.csv", csv)
 
-   -- Also save the run info
+   -- Also save the run info (csv for human readable format)
+   love.filesystem.write("savedata.txt", serialized)
+   love.filesystem.write("savedata.csv", csv)
    love.filesystem.write("stimulus-info.txt", lume.serialize(logger.stimulus_info()))
 end
 
--- Forward declare experimental variables
-local width, height
-local oscillation_frequency, contrast_exponent, luminance
-local canvas_forward, canvas_backward, canvas
-local time, trigger_count, flickerrate, dtotal, offset
-local dot_change, dot_clock, dot_on, dot_color
-local hold, maxrt
-local events, reactions, reaction_times
-
-local experiment_duration, experiment_finished, wait_clock
-local gray, flicker_state
-local start_time
-local twopifreq
-
 function love.load(arg)
+   -- Seed the random generator.
+   math.randomseed(os.time())
 
-   math.randomseed(os.clock()*100000000000)
+   -- Assume we want to show checkerboard onto full FOV, and no resize allowed.
+   window.WIDTH, window.HEIGHT = love.graphics.getDimensions()
 
    -- user set variables
-   oscillation_frequency = arg[1] or 0.1 -- Hz
-   contrast_exponent = arg[2] or 1 -- The exponent of the oscillation.
-   luminance = arg[3] or 0.8
-
-   twopifreq = 2*math.pi*oscillation_frequency
-
-   -- Assume we want to show checkerboard onto full FOV.
-   width, height = love.graphics.getDimensions()
-
+   task.FREQUENCY = arg[1] or 0.1 -- Hz
+   task.FREQUENCY_RADS = 2 * math.pi * task.FREQUENCY
+   task.EXPONENT = arg[2] or 1 -- The exponent of the oscillation.
+   task.LUMINANCE = arg[3] or 0.8
    -- Configuration of checkerboard taken from Jingyuan's matlab experiments
-   local sr = 6 -- radial spacing
-   local sc = 10 -- concentric spacing
+   task.RADIAL_SPACING = 6 -- radial spacing
+   task.CONCENTRIC_SPACING = 10 -- concentric spacing
+   task.FLICKERRATE = 12 -- flickering per second.
+   -- Configuration of the dot
+   task.dot = {}
+   task.dot.SIZE = 10
+   -- The maximum reaction time for computing a "hit"
+   task.MAX_REACTION_TIME = 0.6 -- seconds
+   -- Task timing
+   task.timing = {}
+   task.timing.OFFSET = 10
+   task.timing.TOTAL_DURATION = 20
+   task.timing.RESULTS_DISPLAY_DURATION = 5
+   task.ACQUISITION_DATE = os.date()
 
    -- Create the checkerboard pattern
-   local checks = patterns.checkerboard(width, height, sr, sc)
-
-   --Create a look up table for the values in the checkerboard.
-   -- A reversed checkerboard is done by reverting the LUT.
-   local lut_forward = {{1, 1, 1},{0, 0, 0}}
-   local lut_backward = {{0, 0, 0},{1, 1, 1}}
-
-   canvas_forward = patterns.render_to_texture(checks, lut_forward)
-   canvas_backward = patterns.render_to_texture(checks, lut_backward)
-
+   local CHECKS = patterns.checkerboard(
+      window.WIDTH, window.HEIGHT, task.RADIAL_SPACING, task.CONCENTRIC_SPACING
+   )
    canvas = {}
-   canvas[true] = canvas_forward
-   canvas[false] = canvas_backward
-   flicker_state = true
+   --render_to_texture(pattern, color_LUT)
+   canvas[0] = patterns.render_to_texture(CHECKS, {{0, 0, 0},{1, 1, 1}})
+   canvas[1] = patterns.render_to_texture(CHECKS, {{1, 1, 1},{0, 0, 0}})
 
-   -- Initialize experimental variables.
+   -- Initialize stateful variables.
+   state.is_running = false
+   state.is_finished = false
+   state.time = 0 -- The experimental clock in seconds. Kicks off after the trigger is received.
+   state.flicker_time = 0   -- this keeps track of how much time has passed in flicker cycles
+   state.trigger_count = -1 -- The number of triggers received
+   state.results_display_time_left = task.timing.RESULTS_DISPLAY_DURATION
 
-   time = 0 -- The experimental clock in seconds. Kicks off after the trigger is received.
-   trigger_count = -1 -- The number of triggers received
-   flickerrate = 12 -- flickering per second.
-   dtotal = 0   -- this keeps track of how much time has passed
-
-   offset = 2 -- seconds before stimulus starts
-
-   -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
-   dot_change = mathutils.random_float(0.8, 3)
    -- The dot clock
-   dot_clock = 0
+   dot.clock = 0
+   -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
+   dot.current_isi = mathutils.random_float(0.8, 3)
    -- Whether the dot is active
-   dot_on = true
-   dot_color = {0.5, 0, 0}
-
-   -- Maximum acceptable reaction time for button press hit rate calc.
-   maxrt = 0.6
-
-   -- This is a dummy variable indicating that the experiment hasn't started.
-   -- It signals that the trigger has not been received yet.
-   hold = true
-
-   -- The events that will be saved to the logfile.
-   events = {}
-   -- Add a header to the recorded events.
-   events[1] = {"ONSET", "DURATION"," SAMPLE", "TRIAL_TYPE", "RESPONSE_TIME", "VALUE"}
-
-   reactions = {}
-   reaction_times = {}
-   experiment_duration = 10
-   experiment_finished = false
-   wait_clock = 8
+   dot.is_active = true
+   dot.color = {0.5, 0, 0}
 
    -- The background color, which should eventually depend on the target luminance.
-   gray = 0.5
-   love.graphics.setBackgroundColor(gray, gray, gray)
+   love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
    love.mouse.setVisible(false)
    love.graphics.setFont(love.graphics.newFont(30))
-   start_time = os.date()
 
 end
 
 function love.update(dt)
-
-   if hold then
+   -- Hold off the stateful clocks until we receive the first trigger.
+   if not state.is_running then
       return
    end
 
-   -- This is the normalized change independent of FPS.
-   local change = flickerrate * dt
-   time = time + dt
+   -- Advance clock.
+   state.time = state.time + dt
+   -- Advance flicker normalized by flicker rate (change independent of FPS)
+   state.flicker_time = state.flicker_time + task.FLICKERRATE * dt
+   -- Advance dot reaction time clock
+   dot.clock = dot.clock + dt
 
-    -- we add the time passed since the last update, probably a very small number like 0.01
-   dtotal = dtotal + change
-   if dtotal >= 1 then
-      -- reduce our timer by a second, but don't discard the change... what if
-      -- our framerate is 2/3 of a second?
-      dtotal = dtotal - 1
-      -- Change the flicker state
-      flicker_state = not flicker_state
-   end
-
-   -- Handle the dot
-   dot_clock = dot_clock + dt
-   if dot_clock > dot_change then
-      dot_clock = dot_clock - dot_change
-      dot_change = mathutils.random_float(0.8, 3)
-      love.event.push("flip_dot")
+   if dot.clock > dot.current_isi then
+      dot.clock = dot.clock - dot.current_isi -- Reset the clock and loop for new ISI
+      dot.current_isi = mathutils.random_float(0.8, 3)
+      if dot.is_active then dot.color = {0.8, 0, 0} else dot.color = {0.5, 0, 0} end
+      dot.is_active = not dot.is_active
       reactions[#reactions + 1] = "N/A" -- This will be overwritten by 0 if late or 1 if response
    end
 
    -- State changes if experiment comes to an end
-   if time > experiment_duration then
-      if not experiment_finished then
+   if state.time > task.timing.TOTAL_DURATION then
+      -- This goes inside of this check because we don't want to update the hitrate after the task finishes.
+      if not state.is_finished then
          hitrate = 100 * mathutils.sum(reactions) / #reactions
          avg_rt = mathutils.sum(reaction_times) / #reaction_times
       end
-      experiment_finished = true
-      wait_clock = wait_clock - dt
+      state.is_finished = true
+      state.results_display_time_left = state.results_display_time_left - dt
    end
-
 end
 
 function love.draw()
-
    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
-   if hold then
-      love.graphics.printf("The task will begin shortly...", 0, 2*height/5, width, 'center')
+   if not state.is_running then
+      love.graphics.setColor(0.6, 0, 0)
+      love.graphics.printf("The task will begin shortly...", 0, 2*window.HEIGHT/5, window.WIDTH, 'center')
       -- Draw the dot
-      love.graphics.setColor(dot_color)
-      love.graphics.circle("fill", width/2, height/2, 10, 100)
+      love.graphics.setColor(dot.color)
+      love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
       return
    end
 
-   if not experiment_finished then
+   if not state.is_finished then
       -- This means experiment started, but we are waiting for a steady state.
-      if time < offset then
+      if state.time < task.timing.OFFSET then
          alpha = 0
       else
-         local phase = (time-offset-1/oscillation_frequency/4)*twopifreq
+         local phase = (state.time-task.timing.OFFSET-1/task.FREQUENCY/4)*task.FREQUENCY_RADS
          local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
          local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
-         alpha=(((math.sin(phase)+alpha_offset)/alpha_normalization)^contrast_exponent) * luminance
+         alpha=(((math.sin(phase)+alpha_offset)/alpha_normalization)^task.EXPONENT) * task.LUMINANCE
       end
 
-      -- very important!: reset color before drawing to canvas to have colors properly displayed
-      -- see discussion here: https://love2d.org/forums/viewtopic.php?f=4&p=211418#p211418
       love.graphics.setColor(1, 1, 1, alpha)
       -- Draw the texture
       love.graphics.setBlendMode("alpha")
-      love.graphics.draw(canvas[flicker_state])
+      love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
 
       -- Draw the dot
-      love.graphics.setColor(dot_color)
-      love.graphics.circle("fill", width/2, height/2, 10, 100)
+      love.graphics.setColor(dot.color)
+      love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
 
    -- If the experiment has finished, show the average reaction time and the hit rate.
    else
-      -- love.graphics.setBackgroundColor(1, 1, 1, 1)
-      -- love.graphics.clear(1, 1, 1, 1)
-      love.graphics.setColor(0.6,0,0)
-      love.graphics.printf("Your task results:", 0, 2*height/5 - 30, width, 'center')
       local hitrate_str = string.format("Hit Rate = %.2f %%", hitrate)
-      love.graphics.printf(hitrate_str, 0, 2*height/5 + 20, width, 'center')
       local avg_rt_str = string.format("Average Reaction Time = %.2f seconds", avg_rt)
-      love.graphics.printf(avg_rt_str, 0, 2*height/5 + 70, width, 'center')
 
-      if wait_clock < 0 then
+      love.graphics.setColor(0.6,0,0)
+
+      love.graphics.printf("Your task results:", 0, 2*window.HEIGHT/5 - 30, window.WIDTH, 'center')
+      love.graphics.printf(hitrate_str, 0, 2*window.HEIGHT/5 + 20, window.WIDTH, 'center')
+      love.graphics.printf(avg_rt_str, 0, 2*window.HEIGHT/5 + 70, window.WIDTH, 'center')
+
+      if state.results_display_time_left < 0 then
          save_data(events)
          love.event.quit()
       end
-
-   end
-
-end
-
--- Updates the dot color.
-function love.handlers.flip_dot()
-   if dot_on then
-      dot_color = {0.8, 0, 0}
-      dot_on = false
-   else
-      dot_color = {0.5, 0, 0}
-      dot_on = true
    end
 end
 
@@ -255,22 +189,28 @@ function love.keypressed(key, scancode, isrepeat)
 
    -- Received trigger
    if key == "=" then
-      trigger_count = trigger_count + 1
-      love.event.push("log", time, 0, trigger_count, "TRIGGER", "N/A", "N/A")
-      hold = false
+      state.trigger_count = state.trigger_count + 1
+      love.event.push(
+         "log", state.time, 0, state.trigger_count, "TRIGGER", "N/A", "N/A"
+      )
+      state.is_running = true
    end
 
    -- Received keypress
    if key == "1" or key == "2" or key == "3" or key == "4" then
-      reaction_times[#reaction_times + 1] = dot_clock
-      if dot_clock < maxrt then
-         reactions[#reactions] = 1
-         response = true
-      else
-         reactions[#reactions] = 0
-         response = false
-      end
+      reaction_times[#reaction_times + 1] = dot.clock
+      -- 1 if clock < max reaction time, 0 otherwise
+      reactions[#reactions] = dot.clock < task.MAX_REACTION_TIME and 1 or 0
       -- For now don't care about the duration of the keypress.
-      love.event.push("log", time, 0, trigger_count, "KEYPRESS", dot_clock, key)
+      love.event.push(
+         "log", state.time, 0, state.trigger_count, "KEYPRESS", dot.clock, key
+      )
+      -- draw_pressed = true
+   end
+end
+
+function love.keyreleased(key, scancode)
+   if key == "1" then
+      -- draw_pressed = false
    end
 end

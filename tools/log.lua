@@ -1,3 +1,15 @@
+--[[
+ For logging data in BIDS format, events are saved as following:
+   ONSET, DURATION, SAMPLE, TRIAL_TYPE, RESPONSE_TIME, VALUE
+   where
+   ONSET - the time given in seconds from the first trigger (beginning of acquisition)
+   DURATION - the duration of the event
+   SAMPLE - in which volume TR the event happened.
+   TRIAL_TYPE - categorisation of trial
+   RESPONSE_TIME - the reaction time. N/A refers to no-response
+   VALUE - which key was pressed
+--]]
+
 local log = {}
 
 -- Capture output of command line command
