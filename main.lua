@@ -4,6 +4,10 @@
 -- Author: Daniel Gomez
 -- Date: 10.31.2020
 -----------------------------------------------------------------------------
+local os = require("os")
+local math = require("math")
+local string = require("string")
+
 local logger = require("tools.log")
 local mathutils = require("tools.mathutils")
 local patterns = require("visual.patterns")
@@ -22,8 +26,11 @@ events[1] = {"ONSET", "DURATION"," SAMPLE", "TRIAL_TYPE", "RESPONSE_TIME", "VALU
 local reactions = {} -- A table of reactions to each dot change in the experiment
 local reaction_times = {} -- A table with reaction times.
 
+-- For final results
+local hitrate, avg_rt
 
-local function save_data(data)
+
+local function save_data(data, task_info)
    -- Save a serialized easy to reload data.
    local serialized = lume.serialize(data)
    local csv = logger.to_csv(data)
@@ -31,7 +38,10 @@ local function save_data(data)
    -- Also save the run info (csv for human readable format)
    love.filesystem.write("savedata.txt", serialized)
    love.filesystem.write("savedata.csv", csv)
-   love.filesystem.write("stimulus-info.txt", lume.serialize(logger.stimulus_info()))
+   love.filesystem.write(
+      "stimulus-info.txt",
+      lume.serialize(logger.stimulus_info(task_info.FREQUENCY, task_info.ACQUISITION_DATE))
+   )
 end
 
 function love.load(arg)
@@ -52,7 +62,7 @@ function love.load(arg)
    task.FLICKERRATE = 12 -- flickering per second.
    -- Configuration of the dot
    task.dot = {}
-   task.dot.SIZE = 10
+   task.dot.SIZE = 12
    -- The maximum reaction time for computing a "hit"
    task.MAX_REACTION_TIME = 0.6 -- seconds
    -- Task timing
@@ -140,6 +150,7 @@ function love.draw()
    end
 
    if not state.is_finished then
+      local alpha
       -- This means experiment started, but we are waiting for a steady state.
       if state.time < task.timing.OFFSET then
          alpha = 0
@@ -180,7 +191,7 @@ function love.draw()
       love.graphics.printf(avg_rt_str, 0, 2*window.HEIGHT/5 + 70, window.WIDTH, 'center')
 
       if state.results_display_time_left < 0 then
-         save_data(events)
+         save_data(events, task)
          love.event.quit()
       end
    end
@@ -191,9 +202,9 @@ function love.handlers.log(onset, duration, sample, trial_type, response_time, v
 end
 
 -- Handle keypresses.
-function love.keypressed(key, scancode, isrepeat)
+function love.keypressed(key, scancode)
    if key == "escape" then
-      save_data(events)
+      save_data(events, task)
       love.event.quit()
    end
 
@@ -220,7 +231,7 @@ function love.keypressed(key, scancode, isrepeat)
 end
 
 function love.keyreleased(key, scancode)
-   if key == "1" then
+   if key == "1" or key == "2" or key == "3" or key == "4" then
       dot.draw_pressed = false
    end
 end

@@ -1,9 +1,10 @@
+local math = require("math")
 local mathutils = {}
 
 -- Sum all elements of a table
 mathutils.sum = function(t)
     local sum = 0
-    for k,v in pairs(t) do
+    for _, v in pairs(t) do
        if type(v) == "number" then
           sum = sum + v
        end

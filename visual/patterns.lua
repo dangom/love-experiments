@@ -3,6 +3,7 @@
 -- Author: Daniel Gomez
 -- Date: 10.31.2020
 -----------------------------------------------------------------------------
+local math = require("math")
 local patterns = {}
 
 -- Same as linspace in matlab
@@ -44,7 +45,7 @@ local function concentric(a, b, spacing_concentric)
 end
 
 -- sign function
-math.sign = math.sign or function(x) return x<0 and -1 or x>0 and 1 or 0 end
+local sign = math.sign or function(x) return x<0 and -1 or x>0 and 1 or 0 end
 
 -- The checkerboard generation
 patterns.checkerboard = function(size_x, size_y, sr, sc)
@@ -52,13 +53,13 @@ patterns.checkerboard = function(size_x, size_y, sr, sc)
    local ly = linspace(-1, 1, size_x)
    local x, y = meshgrid(lx, ly)
 
-   checks = {}
+   local checks = {}
    for i, row in ipairs(x) do
       checks[i] = {}
-      for j, tile in ipairs(row) do
+      for j, _ in ipairs(row) do
          local a = x[i][j]
          local b = y[i][j]
-         local check =  math.sign(radial(a, b, sr)) * math.sign(concentric(a,b, sc))
+         local check =  sign(radial(a, b, sr)) * sign(concentric(a,b, sc))
          checks[i][j] = math.floor((check + 1) / 2)
       end
    end
@@ -73,7 +74,7 @@ patterns.render_to_texture = function(array, colorcode)
    -- Take that the array has the size of the screen.
    local width = #array
    local height = #array[1]
-   canvas = love.graphics.newCanvas(width, height)
+   local canvas = love.graphics.newCanvas(width, height)
    love.graphics.setCanvas(canvas)
    love.graphics.clear()
    love.graphics.setBlendMode("alpha")

@@ -9,7 +9,7 @@
    RESPONSE_TIME - the reaction time. N/A refers to no-response
    VALUE - which key was pressed
 --]]
-
+local string = require("string")
 local log = {}
 
 -- Capture output of command line command
@@ -24,7 +24,7 @@ local function os_capture(cmd, raw)
   return s
 end
 
-log.stimulus_info = function()
+log.stimulus_info = function(frequency, start_time)
    local info = {}
    info["OperatingSystem"] = os_capture("uname")
 
@@ -33,7 +33,7 @@ log.stimulus_info = function()
 
    info["SoftwareName"] = "LÖVE"
    info["SoftwareVersion"] = software_version
-   info["Stimulus Frequency"] = oscillation_frequency
+   info["Stimulus Frequency"] = frequency
    info["Start Time"] = start_time
 
    return info
@@ -42,7 +42,7 @@ end
 log.to_csv = function(t)
    local out = {}
    local s = tostring
-   for k, r in pairs(t) do
+   for _, r in pairs(t) do
       local rowstr = string.format("%s\t%s\t%s\t%s\t%s\t%s",
                                    s(r[1]), s(r[2]), s(r[3]), s(r[4]), s(r[5]), s(r[6]))
       out[#out+1] = rowstr
