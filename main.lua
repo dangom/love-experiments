@@ -8,27 +8,27 @@ local os = require("os")
 local math = require("math")
 local string = require("string")
 
-local logger = require("tools.log")
-local mathutils = require("tools.mathutils")
-local patterns = require("visual.patterns")
-local lume = require("lib.lume")
+local love = require("love")
+
+local logger = require("tools.log") -- my logging utilities
+local mathutils = require("tools.mathutils") -- my aux math functions
+local patterns = require("visual.patterns") -- generate flicker checkerboard
+local lume = require("lib.lume") -- for serializing data into a string
+local json = require("lib.JSON")
 
 -- Forward declare experimental variables
 local window = {} -- Window configuration, height and width
 local task = {} -- Task experimental setup variables
 local canvas = {} -- The off-screen canvas with the images to be drawn to screen
 local state = {} -- Current state of the task
-local dot = {}
+local dot = {} -- Control the center dot
 local events = {} -- A variable for logging events.
 -- Add a header to the recorded events.
 events[1] = {"ONSET", "DURATION"," SAMPLE", "TRIAL_TYPE", "RESPONSE_TIME", "VALUE"}
 
 local reactions = {} -- A table of reactions to each dot change in the experiment
 local reaction_times = {} -- A table with reaction times.
-
--- For final results
-local hitrate, avg_rt
-
+local results = {} -- Store the hitrate and the average reaction time.
 
 local function save_data(data, task_info)
    -- Save a serialized easy to reload data.
@@ -39,10 +39,16 @@ local function save_data(data, task_info)
    love.filesystem.write("savedata.txt", serialized)
    love.filesystem.write("savedata.csv", csv)
    love.filesystem.write(
-      "stimulus-info.txt",
-      lume.serialize(logger.stimulus_info(task_info.FREQUENCY, task_info.ACQUISITION_DATE))
+      "runtime-info.json",
+      json:encode_pretty(logger.runtime_info())
    )
+   love.filesystem.write(
+      "stimulus-info.json",
+      json:encode_pretty(task_info)
+   )
+
 end
+
 
 function love.load(arg)
    -- Seed the random generator.
@@ -52,24 +58,24 @@ function love.load(arg)
    window.WIDTH, window.HEIGHT = love.graphics.getDimensions()
 
    -- user set variables
-   task.FREQUENCY = arg[1] or 0.1 -- Hz
+   task.FREQUENCY = tonumber(arg[1]) or 0.1 -- Hz
    task.FREQUENCY_RADS = 2 * math.pi * task.FREQUENCY
-   task.EXPONENT = arg[2] or 1 -- The exponent of the oscillation.
-   task.LUMINANCE = arg[3] or 0.8
+   task.EXPONENT = tonumber(arg[2]) or 1 -- The exponent of the oscillation.
+   task.LUMINANCE = tonumber(arg[3]) or 0.8
    -- Configuration of checkerboard taken from Jingyuan's matlab experiments
    task.RADIAL_SPACING = 6 -- radial spacing
    task.CONCENTRIC_SPACING = 10 -- concentric spacing
    task.FLICKERRATE = 12 -- flickering per second.
    -- Configuration of the dot
    task.dot = {}
-   task.dot.SIZE = 12
+   task.dot.SIZE = 10
    -- The maximum reaction time for computing a "hit"
    task.MAX_REACTION_TIME = 0.6 -- seconds
    -- Task timing
    task.timing = {}
    task.timing.OFFSET = 10
    task.timing.TOTAL_DURATION = 20
-   task.timing.RESULTS_DISPLAY_DURATION = 5
+   task.timing.RESULTS_DISPLAY_DURATION = 4
    task.ACQUISITION_DATE = os.date()
 
    -- Create the checkerboard pattern
@@ -89,6 +95,10 @@ function love.load(arg)
    state.trigger_count = -1 -- The number of triggers received
    state.results_display_time_left = task.timing.RESULTS_DISPLAY_DURATION
 
+   state.keypress = {} -- keeps the timestamp of last keypress for logging keypress durations
+   state.keypress.onset = {}
+   state.keypress.reaction_time = {}
+
    -- The dot clock
    dot.clock = 0
    -- The time it takes for an initial dot color change (uniform rand from 0.8 to 3s)
@@ -104,6 +114,7 @@ function love.load(arg)
    love.graphics.setFont(love.graphics.newFont(30))
 
 end
+
 
 function love.update(dt)
    -- Hold off the stateful clocks until we receive the first trigger.
@@ -130,13 +141,14 @@ function love.update(dt)
    if state.time > task.timing.TOTAL_DURATION then
       -- This goes inside of this check because we don't want to update the hitrate after the task finishes.
       if not state.is_finished then
-         hitrate = 100 * mathutils.sum(reactions) / #reactions
-         avg_rt = mathutils.sum(reaction_times) / #reaction_times
+         results.hitrate = 100 * mathutils.sum(reactions) / #reactions
+         results.avg_rt = mathutils.sum(reaction_times) / #reaction_times
       end
       state.is_finished = true
       state.results_display_time_left = state.results_display_time_left - dt
    end
 end
+
 
 function love.draw()
    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
@@ -181,8 +193,8 @@ function love.draw()
 
    -- If the experiment has finished, show the average reaction time and the hit rate.
    else
-      local hitrate_str = string.format("Hit Rate = %.2f %%", hitrate)
-      local avg_rt_str = string.format("Average Reaction Time = %.2f seconds", avg_rt)
+      local hitrate_str = string.format("Hit Rate = %.2f %%", results.hitrate)
+      local avg_rt_str = string.format("Average Reaction Time = %.2f seconds", results.avg_rt)
 
       love.graphics.setColor(0.6,0,0)
 
@@ -197,9 +209,11 @@ function love.draw()
    end
 end
 
+
 function love.handlers.log(onset, duration, sample, trial_type, response_time, value)
    events[#events + 1] = {onset, duration, sample, trial_type, response_time, value}
 end
+
 
 -- Handle keypresses.
 function love.keypressed(key, scancode)
@@ -219,19 +233,32 @@ function love.keypressed(key, scancode)
 
    -- Received keypress
    if key == "1" or key == "2" or key == "3" or key == "4" then
+
+      state.keypress.onset[key] = state.time
+      state.keypress.reaction_time[key] = dot.clock
+
       reaction_times[#reaction_times + 1] = dot.clock
       -- 1 if clock < max reaction time, 0 otherwise
       reactions[#reactions] = dot.clock < task.MAX_REACTION_TIME and 1 or 0
-      -- For now don't care about the duration of the keypress.
-      love.event.push(
-         "log", state.time, 0, state.trigger_count, "KEYPRESS", dot.clock, key
-      )
+
       dot.draw_pressed = true
    end
 end
 
+
 function love.keyreleased(key, scancode)
    if key == "1" or key == "2" or key == "3" or key == "4" then
+      local duration = state.time - state.keypress.onset[key]
+      love.event.push(
+         "log",
+         state.keypress.onset[key],
+         duration,
+         state.trigger_count,
+         "KEYPRESS",
+         state.keypress.reaction_time[key],
+         key
+      )
+
       dot.draw_pressed = false
    end
 end
