@@ -35,15 +35,20 @@ local function save_data(data, task_info)
    local serialized = lume.serialize(data)
    local csv = logger.to_csv(data)
 
+   local out_dir = os.date("%Y-%m-%d") .. "/" .. task_info.SUB_ID .. "/"
+   love.filesystem.createDirectory(out_dir)
+   local out_name = task_info.RUN_ID .. "_"
+   print(out_name)
+
    -- Also save the run info (csv for human readable format)
-   love.filesystem.write("savedata.txt", serialized)
-   love.filesystem.write("savedata.csv", csv)
+   love.filesystem.write(out_dir .. out_name .. "log.txt", serialized)
+   love.filesystem.write(out_dir .. out_name .. "log.csv", csv)
    love.filesystem.write(
-      "runtime-info.json",
+      out_dir .. out_name .. "runtime-info.json",
       json:encode_pretty(logger.runtime_info())
    )
    love.filesystem.write(
-      "stimulus-info.json",
+      out_dir .. out_name .. "stimulus-info.json",
       json:encode_pretty(task_info)
    )
 
@@ -58,24 +63,30 @@ function love.load(arg)
    window.WIDTH, window.HEIGHT = love.graphics.getDimensions()
 
    -- user set variables
-   task.FREQUENCY = tonumber(arg[1]) or 0.1 -- Hz
-   task.EXPONENT = tonumber(arg[2]) or 1 -- The exponent of the oscillation.
-   task.LUMINANCE = tonumber(arg[3]) or 0.8
+   task.SUB_ID = arg[1] or "DEBUG-sub-id"
+   task.RUN_ID = arg[2] or "DEBUG-run-id"
+
+   task.FREQUENCY = tonumber(arg[3]) or 0.1 -- Hz
+   task.EXPONENT = tonumber(arg[4]) or 1 -- The exponent of the oscillation.
+   task.LUMINANCE = tonumber(arg[5]) or 0.8
+   task.IS_OSCILLATION = arg[6] and true or false
+
+   -- Task timing
+   task.timing = {}
+   task.timing.OFFSET = tonumber(arg[7]) or 2
+   task.timing.TOTAL_DURATION = tonumber(arg[8]) or 10
+   task.timing.RESULTS_DISPLAY_DURATION = 4
+   task.ACQUISITION_DATE = os.date()
+
    -- Configuration of checkerboard taken from Jingyuan's matlab experiments
    task.RADIAL_SPACING = 6 -- radial spacing
    task.CONCENTRIC_SPACING = 10 -- concentric spacing
-   task.FLICKER_FREQUENCY = 12 -- flickering in Hz.
+   task.FLICKER_FREQUENCY = tonumber(arg[9]) or 12 -- flickering in Hz.
    -- Configuration of the dot
    task.dot = {}
    task.dot.SIZE = 10
    -- The maximum reaction time for computing a "hit"
    task.MAX_REACTION_TIME = 0.6 -- seconds
-   -- Task timing
-   task.timing = {}
-   task.timing.OFFSET = 5
-   task.timing.TOTAL_DURATION = 30
-   task.timing.RESULTS_DISPLAY_DURATION = 4
-   task.ACQUISITION_DATE = os.date()
 
    -- Create the checkerboard pattern
    local CHECKS = patterns.checkerboard(
@@ -178,7 +189,11 @@ function love.draw()
          local alpha_offset = 1 -- So that alpha ranges from 0 to 2, instead of -1 to 1.
          local alpha_normalization = 2 -- So that alpha ranges from 0 to 1, instead of 0 to 2.
          state.phase = (state.modulation_time + 0.5) % 1 * 2 * math.pi
-         state.alpha = ((math.cos(state.phase)+alpha_offset)/alpha_normalization)^task.EXPONENT * task.LUMINANCE
+         if task.IS_OSCILLATION then
+            state.alpha = ((math.cos(state.phase)+alpha_offset)/alpha_normalization)^task.EXPONENT * task.LUMINANCE
+         else -- ON/OFF at given frequency
+            state.alpha = state.phase >= math.pi and task.LUMINANCE or 0
+         end
       end
 
       love.graphics.setColor(1, 1, 1, state.alpha)
