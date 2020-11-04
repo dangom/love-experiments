@@ -35,14 +35,13 @@ local function save_data(data, task_info)
    local serialized = lume.serialize(data)
    local csv = logger.to_csv(data)
 
-   local out_dir = os.date("%Y-%m-%d") .. "/" .. task_info.SUB_ID .. "/"
+   local out_dir = task_info.SUB_ID .. "/"
    love.filesystem.createDirectory(out_dir)
    local out_name = task_info.RUN_ID .. "_"
-   print(out_name)
 
    -- Also save the run info (csv for human readable format)
    love.filesystem.write(out_dir .. out_name .. "log.txt", serialized)
-   love.filesystem.write(out_dir .. out_name .. "log.csv", csv)
+   love.filesystem.write(out_dir .. out_name .. "events.csv", csv)
    love.filesystem.write(
       out_dir .. out_name .. "runtime-info.json",
       json:encode_pretty(logger.runtime_info())
@@ -51,6 +50,7 @@ local function save_data(data, task_info)
       out_dir .. out_name .. "stimulus-info.json",
       json:encode_pretty(task_info)
    )
+   print("Files were saved to" .. love.filesystem.getAppdataDirectory() .. "/" .. out_dir .. out_name .. "*")
 
 end
 
@@ -84,9 +84,19 @@ function love.load(arg)
    task.FLICKER_FREQUENCY = tonumber(arg[9]) or 12 -- flickering in Hz.
    -- Configuration of the dot
    task.dot = {}
-   task.dot.SIZE = 10
+   task.dot.SIZE = 12
    -- The maximum reaction time for computing a "hit"
    task.MAX_REACTION_TIME = 0.6 -- seconds
+
+   print(
+      string.format("Setup: Frequency=%.2f Hz, Exponent=%d, Luminance=%.2f %%, Flicker=%d Hz",
+      task.FREQUENCY, task.EXPONENT, 100*task.LUMINANCE, task.FLICKER_FREQUENCY
+   ))
+   print("Is the stimulus a sinusoidal?", task.IS_OSCILLATION)
+   print(
+      string.format("Timing: Offset=%d s, TotalDuration=%.2f s",
+      task.timing.OFFSET, task.timing.TOTAL_DURATION
+   ))
 
    -- Create the checkerboard pattern
    local CHECKS = patterns.checkerboard(
@@ -98,8 +108,9 @@ function love.load(arg)
    canvas[1] = patterns.render_to_texture(CHECKS, {{1, 1, 1},{0, 0, 0}})
 
    -- Initialize stateful variables.
-   state.is_running = false
-   state.is_finished = false
+   state.is_running = false -- Whether the actual task has started (not waiting for trigger)
+   state.is_finished = false -- Whether the task has finished (displaying the results)
+
    state.time = 0 -- The experimental clock in seconds. Kicks off after the trigger is received.
    state.flicker_time = 0   -- this keeps track of how much time has passed in flicker cycles
    state.modulation_time = - task.timing.OFFSET * task.FREQUENCY -- this keeps track of how much the oscillation has evolved
@@ -146,6 +157,11 @@ function love.update(dt)
 
    if dot.clock > dot.current_isi then
       dot.clock = dot.clock - dot.current_isi -- Reset the clock and loop for new ISI
+      if not state.is_finished then
+         love.event.push(
+            "log", state.time, dot.current_isi, state.trigger_count, "DOT_FLIP", "N/A", dot.is_active and 1 or 0
+         )
+      end
       dot.current_isi = mathutils.random_float(0.8, 3)
       if dot.is_active then dot.color = {0.8, 0, 0} else dot.color = {0.5, 0, 0} end
       dot.is_active = not dot.is_active
@@ -159,9 +175,15 @@ function love.update(dt)
          results.hitrate = 100 * mathutils.sum(reactions) / #reactions
          results.avg_rt = mathutils.sum(reaction_times) / #reaction_times
 
+         print(string.format("Hit Rate = %.2f %%", results.hitrate))
+         print(string.format("Average Reaction Time = %.2f seconds", results.avg_rt))
+
          love.event.push(
             "log", state.time, 0, state.trigger_count, "FINISH", "N/A", string.format("%.2f %%", results.hitrate)
          )
+      end
+      if not state.is_finished then
+         print("Task finished at: " .. os.date())
       end
       state.is_finished = true
       state.results_display_time_left = state.results_display_time_left - dt
@@ -251,6 +273,7 @@ function love.keypressed(key, scancode)
       -- Don't push it to the async event logger because we will save and quit immediately.
       events[#events + 1] = {state.time, 0, state.trigger_count, "CANCELLED", "n/a", "n/a"}
       save_data(events, task)
+      print("The run was cancelled after ", state.time, " seconds.")
       love.event.quit()
    end
 
@@ -261,10 +284,14 @@ function love.keypressed(key, scancode)
          "log", state.time, 0, state.trigger_count, "TRIGGER", state.phase, math.floor(state.modulation_time + 0.5)
       )
       state.is_running = true
+
+      if state.trigger_count == 0 then
+         print("Task started at: " .. os.date())
+      end
    end
 
    -- Received keypress
-   if key == "1" or key == "2" or key == "3" or key == "4" then
+   if key == "1" or key == "2" or key == "3" or key == "4" or key == "5" then
 
       state.keypress.onset[key] = state.time
       state.keypress.reaction_time[key] = dot.clock
@@ -279,7 +306,7 @@ end
 
 
 function love.keyreleased(key, scancode)
-   if key == "1" or key == "2" or key == "3" or key == "4" then
+   if key == "1" or key == "2" or key == "3" or key == "4" or key == "5" then
       local duration = state.time - state.keypress.onset[key]
       love.event.push(
          "log",
