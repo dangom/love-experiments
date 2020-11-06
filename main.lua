@@ -234,14 +234,14 @@ function love.draw()
       --    love.graphics.printf(state.modulation_time, 0, 2*window.HEIGHT/5, window.WIDTH, 'center')
       -- end
 
-      if dot.draw_pressed then
-         if reactions[#reactions] == 1 then
-            love.graphics.setColor(0,1,0)
-         else
-            love.graphics.setColor(1,0,0)
-         end
-         love.graphics.circle("line", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
-      end
+      -- if dot.draw_pressed then
+      --    if reactions[#reactions] == 1 then
+      --       love.graphics.setColor(0,1,0)
+      --    else
+      --       love.graphics.setColor(1,0,0)
+      --    end
+      --    love.graphics.circle("line", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
+      -- end
 
    -- If the experiment has finished, show the average reaction time and the hit rate.
    else
