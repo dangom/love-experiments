@@ -69,7 +69,12 @@ function love.load(arg)
    task.FREQUENCY = tonumber(arg[3]) or 0.1 -- Hz
    task.EXPONENT = tonumber(arg[4]) or 1 -- The exponent of the oscillation.
    task.LUMINANCE = tonumber(arg[5]) or 0.8
-   task.IS_OSCILLATION = arg[6] and true or false
+
+   if arg[6] == "1" then
+      task.IS_OSCILLATION = true
+   else
+      task.IS_OSCILLATION = false
+   end
 
    -- Task timing
    task.timing = {}
