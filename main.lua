@@ -139,7 +139,7 @@ function love.load(arg)
    dot.draw_pressed = false
 
    -- The background color, which should eventually depend on the target luminance.
-   love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
+   love.graphics.setBackgroundColor(task.LUMINANCE/2, task.LUMINANCE/2, task.LUMINANCE/2)
    love.mouse.setVisible(false)
    love.graphics.setFont(love.graphics.newFont(30))
 
