@@ -70,6 +70,7 @@ function love.load(arg)
    task.EXPONENT = tonumber(arg[4]) or 1 -- The exponent of the oscillation.
    task.LUMINANCE = tonumber(arg[5]) or 0.8
 
+   -- If task not oscillation, then the contrast will be either ON of OFF.
    if arg[6] == "1" then
       task.IS_OSCILLATION = true
    else
