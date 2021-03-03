@@ -30,6 +30,8 @@ events[1] = {"onset", "duration"," sample", "trial_type", "response_time", "valu
 local reactions = {} -- A table of reactions to each dot change in the experiment
 local reaction_times = {} -- A table with reaction times.
 local results = {} -- Store the hitrate and the average reaction time.
+-- local debug_start = {} -- debug clock start time
+-- local debug_end = {} -- debug clock end time
 
 local function save_data(data, task_info)
    -- Save a serialized easy to reload data.
@@ -164,6 +166,7 @@ function love.update(dt)
 
    -- Advance clock.
    state.time = state.time + dt
+   -- debug_start = love.timer.getTime()
    -- Advance flicker normalized by flicker rate (change independent of FPS)
    state.flicker_time = state.flicker_time + task.FLICKER_FREQUENCY * dt
    -- Advance modulation clock
@@ -245,6 +248,14 @@ function love.draw()
       -- Draw the texture
       love.graphics.setBlendMode("alpha")
       love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
+
+      -- if state.is_running then
+      --    debug_end = love.timer.getTime()
+      --    love.event.push(
+      --       "log", state.time, debug_start, debug_end, "DRAW", "N/A", debug_end - debug_start
+      --    )
+      -- end
+
 
       -- Draw the dot
       love.graphics.setColor(dot.color)
