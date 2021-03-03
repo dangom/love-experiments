@@ -110,6 +110,19 @@ function love.load(arg)
    canvas[0] = patterns.render_to_texture(CHECKS, {{0, 0, 0},{1, 1, 1}})
    canvas[1] = patterns.render_to_texture(CHECKS, {{1, 1, 1},{0, 0, 0}})
 
+   task.IS_SCALEDNOISE = toboolean(arg[10]) or false
+   if  task.IS_SCALEDNOISE then
+      scalednoise = {}
+      scalednoise_rev = {}
+      for i = 1, 37 do
+         scalednoise[i] = love.graphics.newImage("scalednoise/pattern" .. tostring(i) .. ".png")
+         scalednoise_rev[i] = love.graphics.newImage("scalednoise/pattern" .. tostring(i) .. "rev.png")
+      end
+
+   end
+
+  print("Is the stimulus scaled noise?", task.IS_SCALEDNOISE)
+
    -- Initialize stateful variables.
    state.is_running = false -- Whether the actual task has started (not waiting for trigger)
    state.is_finished = false -- Whether the task has finished (displaying the results)
@@ -157,6 +170,13 @@ function love.update(dt)
    state.modulation_time = state.modulation_time + task.FREQUENCY * dt
    -- Advance dot reaction time clock
    dot.clock = dot.clock + dt
+
+   if task.IS_SCALEDNOISE then
+      -- Divide the state.flicker_time by 2 so that the canvas is shown for both positive and negative within 1 flicker cycle.
+      canvas[0] = scalednoise[math.floor(state.flicker_time/2) % 37 + 1]
+      canvas[1] = scalednoise_rev[math.floor(state.flicker_time/2) % 37 + 1]
+   end
+
 
    if dot.clock > dot.current_isi then
       dot.clock = dot.clock - dot.current_isi -- Reset the clock and loop for new ISI
