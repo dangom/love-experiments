@@ -78,8 +78,9 @@ function love.load(arg)
 
    -- Task timing
    task.timing = {}
-   task.timing.OFFSET = tonumber(arg[7]) or 2
-   task.timing.TOTAL_DURATION = tonumber(arg[8]) or 10
+   task.timing.OFFSET = tonumber(arg[7]) or 14
+   task.timing.STIM_RUNTIME = 500 -- no cooldown. math.floor(246 * task.FREQUENCY) / task.FREQUENCY -- 246 = 4 minutes (240) + 6 seconds. 4:20 with offset. Then 25sec cooldown
+   task.timing.TOTAL_DURATION = tonumber(arg[8]) or 50
    task.timing.RESULTS_DISPLAY_DURATION = 4
    task.ACQUISITION_DATE = os.date()
 
@@ -230,7 +231,7 @@ function love.draw()
 
    if not state.is_finished then
       -- This means experiment started, but we are waiting for a steady state.
-      if state.time < task.timing.OFFSET then
+      if (state.time < task.timing.OFFSET) or (state.time > task.timing.OFFSET + task.timing.STIM_RUNTIME) then
          state.phase = math.pi
          state.alpha = 0
       else
