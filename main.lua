@@ -90,9 +90,9 @@ function love.load(arg)
    task.FLICKER_FREQUENCY = tonumber(arg[9]) or 12 -- flickering in Hz.
    -- Configuration of the dot
    task.dot = {}
-   task.dot.SIZE = 5
+   task.dot.SIZE = 7
    -- The maximum reaction time for computing a "hit"
-   task.MAX_REACTION_TIME = 0.6 -- seconds
+   task.MAX_REACTION_TIME = 0.8 -- seconds
 
    print(
       string.format("Setup: Frequency=%.2f Hz, Exponent=%d, Luminance=%.2f %%, Flicker=%d Hz",
