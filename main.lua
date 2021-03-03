@@ -40,7 +40,7 @@ local function save_data(data, task_info)
 
    local out_dir = task_info.SUB_ID .. "/"
    love.filesystem.createDirectory(out_dir)
-   local out_name = task_info.RUN_ID .. "_"
+   local out_name = task_info.RUN_ID .. "_" .. os.date("%H-%M-%S") .. "_"
 
    -- Also save the run info (csv for human readable format)
    love.filesystem.write(out_dir .. out_name .. "log.txt", serialized)
