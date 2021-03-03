@@ -15,6 +15,7 @@ local mathutils = require("tools.mathutils") -- my aux math functions
 local patterns = require("visual.patterns") -- generate flicker checkerboard
 local lume = require("lib.lume") -- for serializing data into a string
 local json = require("lib.JSON") -- for serializing data into json
+local toboolean = require('lib.toboolean')
 
 -- Forward declare experimental variables
 local window = {} -- Window configuration, height and width
@@ -71,11 +72,7 @@ function love.load(arg)
    task.LUMINANCE = tonumber(arg[5]) or 0.8
 
    -- If task not oscillation, then the contrast will be either ON of OFF.
-   if arg[6] == "1" then
-      task.IS_OSCILLATION = true
-   else
-      task.IS_OSCILLATION = false
-   end
+   task.IS_OSCILLATION = toboolean(arg[6]) or true
 
    -- Task timing
    task.timing = {}
