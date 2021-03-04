@@ -2,6 +2,9 @@
 
 * Introduction
 
+#+attr_org: :width 300
+[[./imgs/flickering-checkerboard.png]]
+
 This is my personal fMRI stimulus presentation software. Its goal are to be lightweight, cross-platform, free and easier to use than the alternatives without sacrificing temporal precision. The experiments are programmed in Lua using the LÖVE 2D framework for game development since it aligns with all of the goals described above and provides sufficient and adequate timing precision. Another advantage of this choice is that the framework is widely used and has a thriving and welcoming community, making it easy to find help if necessary.
 
 To run the experiments, first install [[https://love2d.org/][LÖVE]] and then run `love experiment`, where experiment is a directory containing a =main.lua= file. See the examples in this repository.
