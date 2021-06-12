@@ -258,6 +258,9 @@ function love.draw()
       -- end
 
 
+      -- Draw a shim around the dot
+      love.graphics.setColor(task.LUMINANCE/2, task.LUMINANCE/2, task.LUMINANCE/2)
+      love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE + 5)
       -- Draw the dot
       love.graphics.setColor(dot.color)
       love.graphics.circle("fill", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
