@@ -7,7 +7,7 @@
 
 This is my personal fMRI stimulus presentation software. Its goal are to be lightweight, cross-platform, free and easier to use than the alternatives without sacrificing temporal precision. The experiments are programmed in Lua using the LÖVE 2D framework for game development since it aligns with all of the goals described above and provides sufficient and adequate timing precision. Another advantage of this choice is that the framework is widely used and has a thriving and welcoming community, making it easy to find help if necessary.
 
-To run the experiments, first install [[https://love2d.org/][LÖVE]] and then run `love experiment`, where experiment is a directory containing a =main.lua= file. See the examples in this repository.
+To run the experiments, first install [[https://love2d.org/][LÖVE]] and then run `love experiment`, where experiment is a directory containing a =main.lua= file. More info in the installation section below, or see the examples in this repository.
 
 Currently, =love-experiments= only provides flickering checkerboards and flickering scaled noise experiments, since these are the ones I've been using in my own experiments. Nonetheless, the software takes care of the following:
 
@@ -18,3 +18,23 @@ Currently, =love-experiments= only provides flickering checkerboards and flicker
 - Keyboard agnostic
 
 As currently implemented, the code is also performant enough to run on resource starved computers without dropping any single frame.
+
+* Installation
+
+In order to install this, install LÖVE 2D either by downloading the runtime from their official website, or using your package manager (recommended).
+
+Example for MacOS:
+
+#+begin_src sh
+brew install love
+#+end_src
+
+Example for Ubuntu:
+
+#+begin_src sh
+sudo add-apt-repository ppa:bartbes/love-stable
+sudo apt-get update
+sudo apt-get install love
+#+end_src
+
+Then, if not familiar with Lua, use the provided Python wrapper to call and run the script. If familiar with Lua, use love to call the experiment directly.
