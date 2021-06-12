@@ -38,7 +38,7 @@ end
 local function radial(a, b, spacing_radial)
    -- Jingyuan's original
    -- return math.sin((math.sqrt(a*a + b*b)^0.3)*2*math.pi*spacing_radial)
-   -- Jon's suggestion.
+   -- Jon's suggestion to increase size difference from foveal to peripheral vision.
    return math.sin((math.log(a*a + b*b))*spacing_radial)
 end
 
@@ -71,6 +71,7 @@ patterns.checkerboard = function(size_x, size_y, sr, sc)
 
 end
 
+-- This will "preload" the flickering to make flipping displays faster.
 -- Creates a canvas an renders an array to it.
 -- Assumes that colorcode has 2 entries, one for 0 and one for 1.
 patterns.render_to_texture = function(array, colorcode)
