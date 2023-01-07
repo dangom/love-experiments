@@ -60,7 +60,50 @@ local function save_data(data, task_info)
 
 end
 
+
 function love.load(arg)
+
+    -- Create the shader object.
+patternShader = love.graphics.newShader [[
+float radial(float a, float b, float spacing_radial) {
+   return sin((log(a*a + b*b))*spacing_radial);
+}
+
+float concentric(float a, float b, float spacing_concentric) {
+   return sin(atan(a, b) * spacing_concentric);
+}
+
+float sign(float x) {
+   return x < 0.0 ? -1.0 : x > 0.0 ? 1.0 : 0.0;
+}
+
+ extern  float sr;
+  extern  float sc;
+
+ extern  float xsize;
+  extern  float ysize;
+
+extern float oscalpha;
+extern float flicker;
+
+  vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
+    float a = screen_coords.x - xsize;
+    float b = screen_coords.y - ysize;
+    // float a = (texture_coords.x * 2.0 - 1.0) * xsize;
+    // float b = (texture_coords.y * 2.0 - 1.0) * ysize;
+    float check = sign(radial(a, b, sr)) * sign(concentric(a,b, sc));
+    check = floor((check + 1.0) / 2.0);
+    if (flicker > 0.5) {
+     return vec4(flicker - check,flicker- check,flicker -check, oscalpha);
+ } else {
+     return vec4(check, check, check, oscalpha);
+   }
+
+  }
+
+
+]]
+
     -- Seed the random generator.
     math.randomseed(os.time())
 
@@ -80,7 +123,7 @@ function love.load(arg)
 
     -- Task timing
     task.timing = {}
-    task.timing.OFFSET = tonumber(arg[7]) or 14
+    task.timing.OFFSET = tonumber(arg[7]) or 1
     task.timing.STIM_RUNTIME = 500 -- no cooldown. math.floor(246 * task.FREQUENCY) / task.FREQUENCY -- 246 = 4 minutes (240) + 6 seconds. 4:20 with offset. Then 25sec cooldown
     task.timing.TOTAL_DURATION = tonumber(arg[8]) or 50
     task.timing.RESULTS_DISPLAY_DURATION = 4
@@ -108,10 +151,18 @@ function love.load(arg)
     local CHECKS = patterns.checkerboard(window.WIDTH, window.HEIGHT,
                                          task.RADIAL_SPACING,
                                          task.CONCENTRIC_SPACING)
+    -- Send radial spacing and concentric spacing to shader
+    patternShader:send("sr", task.RADIAL_SPACING)
+    patternShader:send("sc", task.CONCENTRIC_SPACING)
+    patternShader:send("xsize", window.WIDTH)
+    patternShader:send("ysize", window.HEIGHT)
+    patternShader:send("oscalpha", 0.0)
+    patternShader:send("flicker",1.0)
+
     canvas = {}
     -- render_to_texture(pattern, color_LUT)
     canvas[0] = patterns.render_to_texture(CHECKS, {{0, 0, 0}, {1, 1, 1}})
-    canvas[1] = patterns.render_to_texture(CHECKS, {{1, 1, 1}, {0, 0, 0}})
+    -- canvas[1] = patterns.render_to_texture(CHECKS, {{1, 1, 1}, {0, 0, 0}})
 
     task.IS_SCALEDNOISE = toboolean(arg[10]) or false
 
@@ -161,6 +212,7 @@ function love.load(arg)
 
 end
 
+local title = nil
 function love.update(dt)
     -- Hold off the stateful clocks until we receive the first trigger.
     if not state.is_running then return end
@@ -218,6 +270,11 @@ function love.update(dt)
         state.is_finished = true
         state.results_display_time_left = state.results_display_time_left - dt
     end
+    local oldtitle = title
+    title = love.timer.getFPS()
+    if title ~= oldtitle then love.window.setTitle(title) end
+
+
 end
 
 function love.draw()
@@ -252,11 +309,20 @@ function love.draw()
                 state.alpha = state.phase >= math.pi and task.LUMINANCE or 0
             end
         end
+        patternShader:send("oscalpha", state.alpha)
 
-        love.graphics.setColor(1, 1, 1, state.alpha)
+        love.graphics.setColor(1, 1, 1)
         -- Draw the texture
-        love.graphics.setBlendMode("alpha")
-        love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
+        -- love.graphics.setBlendMode("alpha")
+        -- love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
+        -- love.graphics.setCanvas(canvas[0])
+
+        love.graphics.setShader(patternShader)
+        patternShader:send("flicker",math.floor(state.flicker_time) % 2)
+        -- love.graphics.setCanvas()
+        -- love.graphics.draw(canvas[0])
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        love.graphics.setShader()
 
         -- if state.is_running then
         --    debug_end = love.timer.getTime()
@@ -345,7 +411,8 @@ function love.keypressed(key, scancode)
     end
 
     -- Received keypress
-    if key == "1" or key == "2" or key == "3" or key == "4" or key == "0" or key == "5" or key == "6" or key == "7" or key == "8" then
+    if key == "1" or key == "2" or key == "3" or key == "4" or key == "0" or key ==
+        "5" or key == "6" or key == "7" or key == "8" then
 
         state.keypress.onset[key] = state.time
         state.keypress.reaction_time[key] = dot.clock
