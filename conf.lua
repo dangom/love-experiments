@@ -22,7 +22,7 @@ function love.conf(t)
     t.window.msaa = 0                   -- The number of samples to use with multi-sampled antialiasing (number)
     t.window.depth = nil                -- The number of bits per sample in the depth buffer
     t.window.stencil = nil              -- The number of bits per sample in the stencil buffer
-    t.window.display = 1                -- Index of the monitor to show the window in (number)
+    t.window.display = 2                -- Index of the monitor to show the window in (number)
     t.window.highdpi = true             -- Enable high-dpi mode for the window on a Retina display (boolean)
     t.window.usedpiscale = true         -- Enable automatic DPI scaling when highdpi is set to true as well (boolean)
     t.window.x = nil                    -- The x-coordinate of the window's position in the specified display (number)
