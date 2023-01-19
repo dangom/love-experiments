@@ -60,7 +60,7 @@ local function save_data(data, task_info)
 
 end
 
-
+local patternShader = {}
 function love.load(arg)
 
     -- Create the shader object.
@@ -274,23 +274,6 @@ function love.update(dt)
     title = love.timer.getFPS()
     if title ~= oldtitle then love.window.setTitle(title) end
 
-
-end
-
-function love.draw()
-    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
-    if not state.is_running then
-        love.graphics.setColor(0.6, 0, 0)
-        love.graphics.printf("The task will begin shortly...", 0,
-                             2 * window.HEIGHT / 5, window.WIDTH, 'center')
-        -- Draw the dot
-        love.graphics.setColor(dot.color)
-        -- love.graphics.setColor(0.1, 0.1, 0.1)
-        love.graphics.circle("fill", window.WIDTH / 2, window.HEIGHT / 2,
-                             task.dot.SIZE)
-        return
-    end
-
     if not state.is_finished then
         -- This means experiment started, but we are waiting for a steady state.
         if (state.time < task.timing.OFFSET) or
@@ -309,56 +292,30 @@ function love.draw()
                 state.alpha = state.phase >= math.pi and task.LUMINANCE or 0
             end
         end
+
         patternShader:send("oscalpha", state.alpha)
+        local flicker = math.floor(state.flicker_time) % 2
+        patternShader:send("flicker", flicker)
 
-        love.graphics.setColor(1, 1, 1)
-        -- Draw the texture
-        -- love.graphics.setBlendMode("alpha")
-        -- love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
-        -- love.graphics.setCanvas(canvas[0])
+    end
 
-        love.graphics.setShader(patternShader)
-        patternShader:send("flicker",math.floor(state.flicker_time) % 2)
-        -- love.graphics.setCanvas()
-        -- love.graphics.draw(canvas[0])
-        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-        love.graphics.setShader()
+end
 
-        -- if state.is_running then
-        --    debug_end = love.timer.getTime()
-        --    love.event.push(
-        --       "log", state.time, debug_start, debug_end, "DRAW", "N/A", debug_end - debug_start
-        --    )
-        -- end
-
-        -- Draw a shim around the dot
-        love.graphics.setColor(task.LUMINANCE / 2, task.LUMINANCE / 2,
-                               task.LUMINANCE / 2)
-        love.graphics.circle("fill", window.WIDTH / 2, window.HEIGHT / 2,
-                             task.dot.SIZE + 5)
+function love.draw()
+    -- The hold means that we are waiting for a trigger, so we don't start the experiment.
+    if not state.is_running then
+        love.graphics.setColor(0.6, 0, 0)
+        love.graphics.printf("The task will begin shortly...", 0,
+                             2 * window.HEIGHT / 5, window.WIDTH, 'center')
         -- Draw the dot
         love.graphics.setColor(dot.color)
+        -- love.graphics.setColor(0.1, 0.1, 0.1)
         love.graphics.circle("fill", window.WIDTH / 2, window.HEIGHT / 2,
                              task.dot.SIZE)
+        return
+    end
 
-        -- Debug clocks
-        -- if true then
-        --    love.graphics.setColor(0.7, 0, 0)
-        --    love.graphics.printf(state.time, 0, window.HEIGHT/5, window.WIDTH, 'center')
-        --    love.graphics.printf(state.modulation_time, 0, 2*window.HEIGHT/5, window.WIDTH, 'center')
-        -- end
-
-        -- if dot.draw_pressed then
-        --    if reactions[#reactions] == 1 then
-        --       love.graphics.setColor(0,1,0)
-        --    else
-        --       love.graphics.setColor(1,0,0)
-        --    end
-        --    love.graphics.circle("line", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
-        -- end
-
-        -- If the experiment has finished, show the average reaction time and the hit rate.
-    else
+    if state.is_finished then
         local hitrate_str = string.format("Hit Rate = %.2f %%", results.hitrate)
         local avg_rt_str = string.format("Average Reaction Time = %.2f seconds",
                                          results.avg_rt)
@@ -376,7 +333,55 @@ function love.draw()
             save_data(events, task)
             love.event.quit()
         end
+        return
     end
+
+    love.graphics.setColor(1, 1, 1)
+    -- Draw the texture
+    -- love.graphics.setBlendMode("alpha")
+    -- love.graphics.draw(canvas[math.floor(state.flicker_time) % 2])
+    -- love.graphics.setCanvas(canvas[0])
+
+    love.graphics.setShader(patternShader)
+    -- love.graphics.setCanvas()
+    -- love.graphics.draw(canvas[0])
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    love.graphics.setShader()
+
+    -- if state.is_running then
+    --    debug_end = love.timer.getTime()
+    --    love.event.push(
+    --       "log", state.time, debug_start, debug_end, "DRAW", "N/A", debug_end - debug_start
+    --    )
+    -- end
+
+    -- Draw a shim around the dot
+    love.graphics.setColor(task.LUMINANCE / 2, task.LUMINANCE / 2,
+                           task.LUMINANCE / 2)
+    love.graphics.circle("fill", window.WIDTH / 2, window.HEIGHT / 2,
+                         task.dot.SIZE + 5)
+    -- Draw the dot
+    love.graphics.setColor(dot.color)
+    love.graphics.circle("fill", window.WIDTH / 2, window.HEIGHT / 2,
+                         task.dot.SIZE)
+
+    -- Debug clocks
+    -- if true then
+    --    love.graphics.setColor(0.7, 0, 0)
+    --    love.graphics.printf(state.time, 0, window.HEIGHT/5, window.WIDTH, 'center')
+    --    love.graphics.printf(state.modulation_time, 0, 2*window.HEIGHT/5, window.WIDTH, 'center')
+    -- end
+
+    -- if dot.draw_pressed then
+    --    if reactions[#reactions] == 1 then
+    --       love.graphics.setColor(0,1,0)
+    --    else
+    --       love.graphics.setColor(1,0,0)
+    --    end
+    --    love.graphics.circle("line", window.WIDTH/2, window.HEIGHT/2, task.dot.SIZE)
+    -- end
+
+    -- If the experiment has finished, show the average reaction time and the hit rate.
 end
 
 function love.handlers.log(onset, duration, sample, trial_type, response_time,
