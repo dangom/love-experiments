@@ -61,7 +61,9 @@ patterns.checkerboard = function(size_x, size_y, sr, sc)
       checks[i] = {}
       for j, _ in ipairs(row) do
          local a = x[i][j]
-         local b = y[i][j]
+         -- Have to multiply by size_x / size_y to make sure that the circle not
+         -- inadvertently scaled by the aspect ratio.
+         local b = y[i][j] * size_x / size_y
          local check =  sign(radial(a, b, sr)) * sign(concentric(a,b, sc))
          checks[i][j] = math.floor((check + 1) / 2)
       end
