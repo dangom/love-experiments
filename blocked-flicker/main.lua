@@ -373,7 +373,7 @@ function love.keypressed(key, scancode)
     end
 
     -- Received keypress
-    if key == "5" or key == "6" or key == "7" or key == "8" or key == "1" or key == "2" or key == "3" or key == "4" or key == "0" then
+    if key == "5" or key == "6" or key == "7" or key == "8" or key == "9" or key == "1" or key == "2" or key == "3" or key == "4" or key == "0" then
 
         state.keypress.onset[key] = state.time
         state.keypress.reaction_time[key] = dot.clock
@@ -387,7 +387,7 @@ function love.keypressed(key, scancode)
 end
 
 function love.keyreleased(key, scancode)
-    if key == "1" or key == "2" or key == "3" or key == "4" or key == "0" then
+    if key == "5" or key == "6" or key == "7" or key == "8" or key == "9" or key == "1" or key == "2" or key == "3" or key == "4" or key == "0" then
         local duration = state.time - state.keypress.onset[key]
         love.event.push("log", state.keypress.onset[key], duration,
                         state.trigger_count, "KEYPRESS",
