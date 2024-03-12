@@ -9,7 +9,7 @@ This is my personal fMRI stimulus presentation software. Its goal are to be ligh
 
 To run the experiments, first install [[https://love2d.org/][LÖVE]] and then run `love experiment`, where experiment is a directory containing a =main.lua= file. More info in the installation section below, or see the examples in this repository. Example code to parse the logfiles and plot task performance is also provided.
 
-Currently, =love-experiments= only provides flickering checkerboards and flickering scaled noise experiments, since these are the ones I've been using in my own experiments. Nonetheless, the software takes care of the following:
+Currently, =love-experiments= only provides flickering checkerboards and flickering scaled noise experiments, since these are the ones I've been using in my own visual experiments. Nonetheless, the software takes care of the following:
 
 - Logging of keypresses and scanner triggers in close to BIDS compatible format
 - Log results even if the experiment exits early or fails
@@ -38,3 +38,14 @@ sudo apt-get install love
 #+end_src
 
 Then, if not familiar with Lua, use the provided Python wrapper to call and run the script. If familiar with Lua, use love to call the experiment directly.
+
+Once love is installed:
+
+#+begin_src sh
+git clone https://github.com/dangom/love-experiments.git
+./run_oscillatory_flicker.py  --frequency 0.20 --tr 1 --n_volumes 200 --offset 0 --sub_id "test" --run_id "test"
+# or
+# /run_blocked_flicker.py --on_blocksize 15 --off_blocksize 45 --flicker 8 --offset 0 --tr 1 --n_volumes 500 --sub_id "test"  --scalednoise 0 --luminance 0.7 --run_id "test"
+#+end_src
+
+

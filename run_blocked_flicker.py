@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run a flickering checkerboard stimulus.
+Run a blocked flickering checkerboard stimulus.
 """
 import argparse
 import subprocess
@@ -12,35 +12,26 @@ def cli_parser():
     Parse command line arguments to generate a call to my LOVE flickering checkerboard experiment.
     """
     parser = argparse.ArgumentParser(description=__doc__)
+
     parser.add_argument(
-        "--blocked",
-        help="Whether to have ON/OFF instead of sinusoidal modulation",
-        action="store_false",
+        "--on_blocksize",
+        type=float,
+        help="Duration of the ON block",
+        required=True,
     )
 
     parser.add_argument(
-        "--scalednoise",
-        type=int,
-        help="Whether to use scaled noise instead of a flickering checkerboard",
-        default=0
+        "--off_blocksize",
+        type=float,
+        help="Duration of the OFF block",
+        required=True,
     )
 
-
-    parser.add_argument(
-        "--exponent", type=int, help="Exponent of contrast modulation", default=1
-    )
     parser.add_argument(
         "--luminance", type=float, help="Maximum luminance for stimulus", default=0.8
     )
     parser.add_argument(
         "--flicker", type=int, help="The flicker frequency in Hz", default=12
-    )
-
-    parser.add_argument(
-        "--frequency",
-        type=float,
-        help="The stimulus oscillatory frequency",
-        required=True,
     )
 
     parser.add_argument("--tr", type=float, help="The TR in seconds", required=True)
@@ -68,6 +59,14 @@ def cli_parser():
         help="The run ID. Use same name as the task in the protocol.",
         required=True
     )
+
+    parser.add_argument(
+        "--scalednoise",
+        type=int,
+        help="Whether to use scaled noise instead of a flickering checkerboard",
+        default=0
+    )
+
     return parser
 
 
@@ -80,13 +79,12 @@ def run():
 
     cmd = [
         "love",
-        op.join(op.dirname(__file__), "flicker"),
+        op.join(op.dirname(__file__), "blocked-flicker"),
         args.sub_id,
         args.run_id,
-        str(args.frequency),
-        str(args.exponent),
+        str(args.on_blocksize),
+        str(args.off_blocksize),
         str(args.luminance),
-        str(int(args.blocked)),
         str(args.offset),
         str(args.tr * args.n_volumes + 3),
         str(args.flicker),
